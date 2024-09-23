@@ -1,0 +1,145 @@
+#include <linux/module.h>
+#include <linux/kernel.h>
+#include <linux/slab.h>
+#include <linux/stddef.h>
+#include <linux/fs.h>
+#include <linux/genhd.h>
+#include <linux/pagemap.h>
+#include <linux/highmem.h>
+#include <linux/iversion.h>
+#include "pintfs.h"
+#include <linux/buffer_head.h>
+
+#define DEBUG 1
+
+
+static void pintfs_put_super(struct super_block *sb)
+{
+	struct pintfs_sb_info *sbi = PINTFS_SB(sb);
+	struct pintfs_super_block *ps = sbi->s_es;
+
+	if (DEBUG)
+		printk("pintfs - put_super\n");
+
+	kfree(ps);
+	kfree(sbi);
+	sb->s_fs_info = NULL;
+	return;
+}
+
+static int pintfs_statfs(struct dentry *dentry, struct kstatfs *buf)
+{
+	if (DEBUG) 
+		printk("pintfs - statfs\n");
+	return 0;
+}
+
+const struct super_operations pintfs_super_ops = {
+	.put_super = pintfs_put_super,	
+	.statfs = pintfs_statfs,
+};
+
+static int pintfs_fill_super(struct super_block *sb, void *data, int silent)
+{
+	struct pintfs_sb_info *sbi;
+	struct pintfs_super_block *ps;
+	unsigned long sb_block = 0;		/* Default location */
+	struct inode *root;
+	long ret = -ENOMEM;
+	struct buffer_head *bh;
+
+	if (DEBUG) printk("pintfs - fill_super\n");
+
+	sbi = kzalloc(sizeof(*sbi), GFP_KERNEL);
+	if(!sbi)
+		goto failed;
+	
+	bh = sb_bread(sb, sb_block);
+	if(!bh)
+		goto failed_sbi;
+
+	sb->s_fs_info = sbi;
+	//s_es must be initialized as soon as possible! << from ext2.h
+	ps = (struct pintfs_super_block *) (((char *)bh->b_data));
+	sbi->s_es = kzalloc(sizeof(struct pintfs_super_block), GFP_KERNEL);
+	if(!sbi->s_es)
+		goto failed_bh;
+	memcpy(sbi->s_es, ps, sizeof(struct pintfs_super_block));
+	sbi->s_first_ino = PINTFS_GOOD_FIRST_INO;
+	sbi->s_inode_size = 64;
+
+	sb->s_magic = ps->magic;
+	// Here is a problem!
+	// super_operations의 미구현으로 발생하는 오류였다!
+	sb->s_op = &pintfs_super_ops;
+
+	root = new_inode(sb);
+	if(!root){
+		ret = -ENOMEM;
+		goto failed_s_es;
+	}
+	
+	root->i_ino = PINTFS_ROOT_INO;
+	/* inode_init_owner(&init_user_ns, root, NULL, 
+			(S_IFDIR | S_IRUGO | S_IWUGO | S_IXUGO)); */
+	root->i_sb = sb;
+	root->i_op = &pintfs_dir_inode_ops;
+	root->i_fop = &pintfs_dir_ops;
+	root->i_atime = root->i_mtime = root->i_ctime = current_time(root);
+	root->i_mode = S_IFDIR | 0755;
+	root->i_flags = 0;
+
+	// setting root directory
+	sb->s_root = d_make_root(root);
+	if(!sb->s_root) {
+		ret = -ENOMEM;
+		goto failed_inode;
+	}
+
+	brelse(bh);
+	return 0;
+
+failed_inode:
+	iput(root);
+failed_s_es:
+	kfree(sbi->s_es);
+failed_bh:
+	brelse(bh);
+failed_sbi:
+	sb->s_fs_info = NULL;
+	kfree(sbi);
+failed:
+	return ret;
+}
+
+static struct dentry *pintfs_mount(struct file_system_type *fs_type, int flags,
+		const char *dev_name, void *data)
+{
+	return mount_bdev(fs_type, flags, dev_name, data, pintfs_fill_super);
+}
+
+static struct file_system_type pintfs_type = {
+	.owner = THIS_MODULE, // for controlling ref_count to protect module wit mount and unmount
+	.name = "pintfs",
+	.mount = pintfs_mount,
+	.kill_sb = kill_block_super,
+	.fs_flags = FS_REQUIRES_DEV,
+};
+MODULE_ALIAS_FS("pintfs");
+
+static int __init init_pintfs(void)
+{ // __init <- for being in initialize code section
+	return register_filesystem(&pintfs_type);	
+}
+
+static void __exit exit_pintfs(void)
+{
+	unregister_filesystem(&pintfs_type);
+}
+
+module_init(init_pintfs);
+module_exit(exit_pintfs);
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Pyo YeongJong");
+MODULE_DESCRIPTION("Pintfs: A simple virtual filesystem");
