@@ -34,6 +34,8 @@ static ssize_t pint_read(struct file *filp, char __user *buf, size_t count, loff
 	
 	sb = inode->i_sb;
 	printk("r : readblock\n");
+
+
 	
 	// inode get
 

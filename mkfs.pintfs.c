@@ -4,24 +4,9 @@
 #include <sys/types.h>
 #include <unistd.h> // pwrite
 #include <fcntl.h> // open
+#include <time.h>
 
-#define PINTFS_MAGIC_NUMBER 0xDEADBEEE
-#define PINTFS_BLOCK_SIZE (1<<12)
-
-struct pintfs_super_block {
-	unsigned int	magic;			/* MAGIC NUMBER */
-	unsigned int	block_size;		/* 블록 크기 */
-	unsigned int	inodes_count;		/* 총 Inode 개수 */
-	unsigned int	blocks_count;		/* 총 block 개수 */
-	unsigned int	blocksize_bits;	/* block size 비트로(12) */
-	unsigned int	free_blocks;	/* 사용가능 blocks */
-	unsigned int	free_inodes;	/* 사용가능 inodes */
-	int				inode_bitmap_block;
-	int				block_bitmap_block;
-	int				first_inode_block;
-	unsigned int	first_data_block;	/* 5 */
-};
-
+#include "pintfs_common.h"
 
 void init_super_block(int fd){
 	struct pintfs_super_block sb;
@@ -62,7 +47,54 @@ void init_bitmaps(int fd){
 	}
 }
 
+#define S_IFDIR		1
+#define S_IFREG		0
+void init_root_inode_info(int fd)
+{
+	struct pintfs_inode root_inode;
+	
+	root_inode.i_mode = S_IFDIR;
+	root_inode.i_uid = 1000;
+	root_inode.i_size = 0;
+	root_inode.i_time = time(NULL);
+	for(int i=0; i<PINTFS_N_BLOCKS; i++){
+		if(i == 0)
+			root_inode.i_block[i] = PINTFS_FIRST_DATA_BLOCK; //Not 5th block address, Just 5!
+		else
+			root_inode.i_block[i] = 0;
+	}
+	root_inode.i_blocks = 0; 
 
+	if (pwrite(fd, root_inode, sizeof(struct pintfs_inode), PINTFS_BLOCK_SIZE * 3) 
+				!= sizeof(struct pintfs_inode))
+	{
+		perror("Failed to wrtie root_inode");
+		close(fd);
+		exit(1);
+	}
+}
+
+void write_root_dir_entry(int fd)
+{
+	struct pintfs_dir_entry dir_entries[2];
+
+	strcpy(dir_entries[0].name, ".");
+	dir_entries[0].size = 0;
+	dir_entries[0].inode_number = PINTFS_ROOT_INO;
+
+	strcpy(dir_entries[1].name, "..");
+	dir_entries[1].size = 0;
+	dir_entries[1].inode_number = PINTFS_ROOT_INO;
+
+	if(pwrite(fd, dir_entrries, sizeof(dir_entries), PINTFS_BLOCK_SIZE * PINTFS_FIRST_DATA_BLOCK)
+			!= sizeof(dir_entries))
+	{
+		perror("Failed to write root_dir_entry");
+		close(fd);
+		exit(1);
+	}
+}
+	
 
 int main(int argc, char *argv[]) {
 	
@@ -79,7 +111,9 @@ int main(int argc, char *argv[]) {
 
 	init_super_block(fd);
 	init_bitmaps(fd);
-	//TODO: Should I init Root inode?
+	init_root_inode_info(fd);
+	write_root_dir_entry(fd);
+
 	printf("Pintfs init successed on %s\n",argv[1]);
 	close(fd);
 

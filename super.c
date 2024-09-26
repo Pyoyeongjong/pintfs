@@ -12,7 +12,6 @@
 
 #define DEBUG 1
 
-
 static void pintfs_put_super(struct super_block *sb)
 {
 	struct pintfs_sb_info *sbi = PINTFS_SB(sb);
@@ -79,7 +78,7 @@ static int pintfs_fill_super(struct super_block *sb, void *data, int silent)
 		goto failed_s_es;
 	}
 	
-	root->i_ino = PINTFS_ROOT_INO;
+	root->i_ino = PINTFS_ROOT_INO; // 이걸 적어줌으로써 root inode가 되는 것이다.
 	/* inode_init_owner(&init_user_ns, root, NULL, 
 			(S_IFDIR | S_IRUGO | S_IWUGO | S_IXUGO)); */
 	root->i_sb = sb;
