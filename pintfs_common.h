@@ -1,17 +1,24 @@
 #define PINTFS_MAGIC_NUMBER 0xDEADBEEF
 #define PINTFS_BLOCK_SIZE (1 << 12) /* 4KB */
-#define PINTFS_N_BLOCKS		11
+#define PINTFS_N_BLOCKS		10
+
 #define PINTFS_MAX_FILE_SIZE (PINTFS_BLOCK_SIZE) * PINTFS_N_BLOCKS;
-#define PITNFS_INODE_SIZE 64
+#define PINTFS_INODE_SIZE			64
 #define PINTFS_INODE_BITMAP_SIZE	128
 #define PINTFS_BLOCK_BITMAP_SIZE	64
+
+#define PINTFS_INODE_BITMAP_BLOCK	1
+#define PINTFS_BLOCK_BITMAP_BLOCK	2
+#define PINTFS_FIRST_INODE_BLOCK	3
+#define PINTFS_FIRST_DATA_BLOCK		5
 
 #define PINTFS_BAD_INO		0
 #define PINTFS_ROOT_INO		1
 #define PINTFS_GOOD_FIRST_INO 2
 
 #define MAX_NAME_SIZE 15
-#define PINTFS_FIRST_DATA_BLOCK	5
+#define ISDIR	1
+#define ISREG	0
 
 struct pintfs_super_block {
 	unsigned int	magic;			/* MAGIC NUMBER */
@@ -38,13 +45,13 @@ struct pintfs_inode {
 	int i_mode;		/* File mode */
 	int i_uid;		/* Low 16 bits of Owner Uid */
 	ssize_t i_size;		/* Size in bytes */
-	int i_time;		/* Access, Create, Modificate, or Deletion Time */
+	long long i_time;		/* Access, Create, Modificate, or Deletion Time */
 	unsigned int i_block[PINTFS_N_BLOCKS]; /* Direct Block List */
 	unsigned int i_blocks; /* Indirect Block List - UNUSED */
 };
 
 struct pintfs_dir_entry{
-	char name[MAXi_NAME_SIZE];
+	char name[MAX_NAME_SIZE];
 	int size;
 	int inode_number;
 };

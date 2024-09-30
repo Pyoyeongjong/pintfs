@@ -20,6 +20,9 @@ static inline struct pintfs_sb_info *PINTFS_SB(struct super_block *sb)
 	return sb->s_fs_info;
 }
 
-#define PINTFS_FIRST_INO(s)		(PINTFS_SB(s)->s_first_ino)
-#define PINTFS_INODE_SIZE(s)	(PINTFS_SB(s)->s_inode_size)
-#define PINTFS_BLOCK_SIZE_BITS(s)	((s)->s_block_size_bits)
+static inline int get_inum_to_block(int inum)
+{
+	int inodes_per_block = PINTFS_BLOCK_SIZE / PINTFS_INODE_SIZE;
+	return PINTFS_FIRST_INODE_BLOCK + inum / inodes_per_block; 
+}
+

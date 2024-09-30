@@ -47,13 +47,13 @@ void init_bitmaps(int fd){
 	}
 }
 
-#define S_IFDIR		1
-#define S_IFREG		0
+#define ISDIR		1
+#define ISREG		0
 void init_root_inode_info(int fd)
 {
 	struct pintfs_inode root_inode;
 	
-	root_inode.i_mode = S_IFDIR;
+	root_inode.i_mode = ISDIR;
 	root_inode.i_uid = 1000;
 	root_inode.i_size = 0;
 	root_inode.i_time = time(NULL);
@@ -65,7 +65,7 @@ void init_root_inode_info(int fd)
 	}
 	root_inode.i_blocks = 0; 
 
-	if (pwrite(fd, root_inode, sizeof(struct pintfs_inode), PINTFS_BLOCK_SIZE * 3) 
+	if (pwrite(fd, &root_inode, sizeof(struct pintfs_inode), PINTFS_BLOCK_SIZE * 3) 
 				!= sizeof(struct pintfs_inode))
 	{
 		perror("Failed to wrtie root_inode");
@@ -86,7 +86,7 @@ void write_root_dir_entry(int fd)
 	dir_entries[1].size = 0;
 	dir_entries[1].inode_number = PINTFS_ROOT_INO;
 
-	if(pwrite(fd, dir_entrries, sizeof(dir_entries), PINTFS_BLOCK_SIZE * PINTFS_FIRST_DATA_BLOCK)
+	if(pwrite(fd, dir_entries, sizeof(dir_entries), PINTFS_BLOCK_SIZE * PINTFS_FIRST_DATA_BLOCK)
 			!= sizeof(dir_entries))
 	{
 		perror("Failed to write root_dir_entry");
