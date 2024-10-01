@@ -11,7 +11,9 @@
 #include <linux/buffer_head.h>
 
 #define DEBUG 1
-
+/*
+	pintfs_put_super - remove memory of super_block
+*/
 static void pintfs_put_super(struct super_block *sb)
 {
 	struct pintfs_sb_info *sbi = PINTFS_SB(sb);
@@ -26,6 +28,9 @@ static void pintfs_put_super(struct super_block *sb)
 	return;
 }
 
+/*
+	pintfs_statfs - superblock stats
+*/
 static int pintfs_statfs(struct dentry *dentry, struct kstatfs *buf)
 {
 	if (DEBUG) 
@@ -33,16 +38,22 @@ static int pintfs_statfs(struct dentry *dentry, struct kstatfs *buf)
 	return 0;
 }
 
+/*
+	SUPER_OPERATIONS
+*/
 const struct super_operations pintfs_super_ops = {
 	.put_super = pintfs_put_super,	
 	.statfs = pintfs_statfs,
 };
 
+/*
+	pintfs_fill_super - Initialize Superblock in main memory
+*/
 static int pintfs_fill_super(struct super_block *sb, void *data, int silent)
 {
 	struct pintfs_sb_info *sbi;
 	struct pintfs_super_block *ps;
-	unsigned long sb_block = 0;		/* Default location */
+	unsigned long sb_block = PINTFS_SUPER_BLOCK;		/* Default location */
 	struct inode *root;
 	long ret = -ENOMEM;
 	struct buffer_head *bh;
@@ -65,11 +76,11 @@ static int pintfs_fill_super(struct super_block *sb, void *data, int silent)
 		goto failed_bh;
 	memcpy(sbi->s_es, ps, sizeof(struct pintfs_super_block));
 	sbi->s_first_ino = PINTFS_GOOD_FIRST_INO;
-	sbi->s_inode_size = 64;
+	sbi->s_inode_size = PINTfS_INODE_SIZE;
 
 	sb->s_magic = ps->magic;
 	// Here is a problem!
-	// super_operations의 미구현으로 발생하는 오류였다!
+	// super_operations no Implementation -> ERROR!
 	sb->s_op = &pintfs_super_ops;
 
 	root = new_inode(sb);
@@ -78,7 +89,7 @@ static int pintfs_fill_super(struct super_block *sb, void *data, int silent)
 		goto failed_s_es;
 	}
 	
-	root->i_ino = PINTFS_ROOT_INO; // 이걸 적어줌으로써 root inode가 되는 것이다.
+	root->i_ino = PINTFS_ROOT_INO;
 	/* inode_init_owner(&init_user_ns, root, NULL, 
 			(S_IFDIR | S_IRUGO | S_IWUGO | S_IXUGO)); */
 	root->i_sb = sb;
@@ -111,12 +122,18 @@ failed:
 	return ret;
 }
 
+/*
+   pintfs_mount - Register this filesystem in Linux and synchronize with Disk Image
+*/
 static struct dentry *pintfs_mount(struct file_system_type *fs_type, int flags,
 		const char *dev_name, void *data)
 {
 	return mount_bdev(fs_type, flags, dev_name, data, pintfs_fill_super);
 }
 
+/*
+	pintfs_type - type of filesystem
+*/
 static struct file_system_type pintfs_type = {
 	.owner = THIS_MODULE, // for controlling ref_count to protect module wit mount and unmount
 	.name = "pintfs",
@@ -126,6 +143,9 @@ static struct file_system_type pintfs_type = {
 };
 MODULE_ALIAS_FS("pintfs");
 
+/*
+	init_pintfs, exit_pintfs - init, exit module
+*/
 static int __init init_pintfs(void)
 { // __init <- for being in initialize code section
 	return register_filesystem(&pintfs_type);	

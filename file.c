@@ -5,6 +5,8 @@
 #include <linux/buffer_head.h>
 #include "pintfs.h"
 #define DEBUG 1
+
+//TODO:
 static ssize_t pint_read(struct file *filp, char __user *buf, size_t count, loff_t *pos)
 {
 	struct pintfs_inode filedata;
@@ -33,30 +35,36 @@ static ssize_t pint_read(struct file *filp, char __user *buf, size_t count, loff
 	}
 	
 	sb = inode->i_sb;
-	printk("r : readblock\n");
-
-
-	
-	// inode get
+	printk("r : readblock\n");	
+	// inode get...
 
 	return 0;
 }
 
+/*
 static ssize_t pint_write(struct file *filp, const char __user *buf, size_t count, loff_t *pos)
 {
 	return 0;
 }
+*/
 
+/*
 static int pint_open(struct inode *inode, struct file *filp)
 {
 	return 0;
 }
+*/
 
+/*
 static int pint_release(struct inode *inode, struct file *filp)
 {
 	return 0;
 }
+*/
 
+/*
+   FILE_OPERATIONS
+*/
 const struct file_operations pintfs_file_ops = {
 	.read = pint_read,
 	.write = pint_write,

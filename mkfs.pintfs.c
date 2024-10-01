@@ -8,6 +8,9 @@
 
 #include "pintfs_common.h"
 
+/*
+   init_super_block - Write superblock metadata in 0st block
+*/
 void init_super_block(int fd){
 	struct pintfs_super_block sb;
 
@@ -22,7 +25,7 @@ void init_super_block(int fd){
 	sb.first_inode_block = 3;
 	sb.first_data_block = 5;
 
-	// Disk가 FD 형식으로 전달된다!
+	// Disk is handled like file!
 	if (pwrite(fd, &sb, sizeof(sb), 0) != sizeof(sb)) {
 		perror("Failed to wrtie pintfs_superblock");
 		close(fd);
@@ -30,6 +33,9 @@ void init_super_block(int fd){
 	}	
 }
 
+/*
+   init_bitmaps - Write bitmap datas in 1st, 2nd block
+*/
 void init_bitmaps(int fd){
 	unsigned char bitmap_block[PINTFS_BLOCK_SIZE];
 	memset(bitmap_block, 0, PINTFS_BLOCK_SIZE);
@@ -49,6 +55,9 @@ void init_bitmaps(int fd){
 
 #define ISDIR		1
 #define ISREG		0
+/*
+   init_root_inode_info - Write root inode in 3rd block
+*/
 void init_root_inode_info(int fd)
 {
 	struct pintfs_inode root_inode;
@@ -74,6 +83,9 @@ void init_root_inode_info(int fd)
 	}
 }
 
+/*
+   write_root_dir_entry - Write root dir_entry int 5th block
+*/
 void write_root_dir_entry(int fd)
 {
 	struct pintfs_dir_entry dir_entries[2];

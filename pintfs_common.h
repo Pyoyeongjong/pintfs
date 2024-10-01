@@ -7,6 +7,7 @@
 #define PINTFS_INODE_BITMAP_SIZE	128
 #define PINTFS_BLOCK_BITMAP_SIZE	64
 
+#define PINTFS_SUPER_BLOCK			0
 #define PINTFS_INODE_BITMAP_BLOCK	1
 #define PINTFS_BLOCK_BITMAP_BLOCK	2
 #define PINTFS_FIRST_INODE_BLOCK	3
@@ -20,6 +21,9 @@
 #define ISDIR	1
 #define ISREG	0
 
+/* 
+	pintfs_super_block - Superblock Metadata (It is on 0 block)
+*/
 struct pintfs_super_block {
 	unsigned int	magic;			/* MAGIC NUMBER */
 	unsigned int	block_size;		/* 블록 크기 */
@@ -34,13 +38,18 @@ struct pintfs_super_block {
 	unsigned int	first_data_block;	/* 5 */
 };
 
+/*
+   pintfs_sb_info - Pintfs Superblock Info
+*/
 struct pintfs_sb_info {
 	struct pintfs_super_block *s_es; /* pintfs_super_block */
 	int s_first_ino; /* First inode (2) */
 	int s_inode_size;		/* Inode byte 크기 (64bytes)*/
 };
 
-// It will be on the disk
+/*
+   pintfs_inode
+*/
 struct pintfs_inode {
 	int i_mode;		/* File mode */
 	int i_uid;		/* Low 16 bits of Owner Uid */
@@ -50,6 +59,9 @@ struct pintfs_inode {
 	unsigned int i_blocks; /* Indirect Block List - UNUSED */
 };
 
+/*
+   pintfs_dir_entry - just dir_entry on disk
+*/
 struct pintfs_dir_entry{
 	char name[MAX_NAME_SIZE];
 	int size;

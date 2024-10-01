@@ -10,7 +10,7 @@
 #define DEBUG 1
 
 /*
-pintfs_write_inode: Write pintfs_inode in block device
+	pintfs_write_inode - Write pintfs_inode in block device
 */
 static int pintfs_write_inode(struct super_block *sb, int inum, struct pintfs_inode* pinode)
 {
@@ -31,8 +31,7 @@ static int pintfs_write_inode(struct super_block *sb, int inum, struct pintfs_in
 
 
 /* 
-   pintfs_empty_inode
-   inode bitmap을 탐색해 비어있는 가장 작은 ino를 return
+	pintfs_empty_inode - Seek inode bitmap and return smallest available ino
 */
 
 static int pintfs_empty_inode(struct super_block *sb)
@@ -63,6 +62,9 @@ static int pintfs_empty_inode(struct super_block *sb)
 	return -1;
 }
 
+/*
+	pintfs_new_inode - Make new pintfs_inode and record in disk
+*/
 struct inode *pintfs_new_inode(const struct inode *dir, umode_t mode)
 {
 	struct pintfs_inode pinode;
@@ -106,26 +108,11 @@ struct inode *pintfs_new_inode(const struct inode *dir, umode_t mode)
 	return inode;
 }
 
-static struct dentry *pint_lookup(struct inode *parent_inode, 
-		struct dentry *child_dentry, unsigned int flags)
-{
-	return NULL;
-}
-
-static int pint_mkdir(struct inode *parent_inode, struct dentry *child_dentry, umode_t mod)
-{
-	return 0;
-}
-
-static int pint_rmdir(struct inode *parent_inode, struct dentry *child_dentry)
-{
-	return 0;
-}
-
+/*
+   INODE_OPERATIONS
+*/
 const struct inode_operations pintfs_inode_ops = {
-	.lookup = pint_lookup,
-	.mkdir = pint_mkdir,
-	.rmdir = pint_rmdir,
+	.setattr	=	pintfs_setattr,
 };
 
 
