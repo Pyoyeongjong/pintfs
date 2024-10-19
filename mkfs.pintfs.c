@@ -16,14 +16,14 @@ void init_super_block(int fd){
 
 	sb.magic = PINTFS_MAGIC_NUMBER;
 	sb.block_size = PINTFS_BLOCK_SIZE;
-	sb.inodes_count = 128;
-	sb.blocks_count = 64;
-	sb.free_blocks = sb.blocks_count - 4;
-	sb.free_inodes = sb.inodes_count - 1;
-	sb.inode_bitmap_block = 1;
-	sb.block_bitmap_block = 2;
-	sb.first_inode_block = 3;
-	sb.first_data_block = 5;
+	sb.inodes_count = PINTFS_INODE_BITMAP_SIZE;
+	sb.blocks_count = PINTFS_BLOCK_BITMAP_SIZE;
+	sb.free_blocks = sb.blocks_count - PINTFS_FIRST_DATA_BLOCK;
+	sb.free_inodes = sb.inodes_count - PINTFS_GOOD_FIRST_INO;
+	sb.inode_bitmap_block = PINTFS_INODE_BITMAP_BLOCK;
+	sb.block_bitmap_block = PINTFS_BLOCK_BITMAP_BLOCK;
+	sb.first_inode_block = PINTFS_FIRST_INODE_BLOCK;
+	sb.first_data_block = PINTFS_FIRST_DATA_BLOCK;
 
 	// Disk is handled like file!
 	if (pwrite(fd, &sb, sizeof(sb), 0) != sizeof(sb)) {
@@ -34,11 +34,14 @@ void init_super_block(int fd){
 }
 
 /*
-   init_bitmaps - Write bitmap datas in 1st, 2nd block
+   init_bitmaps - Write bitmap datas in 1st, 2nd block and
 */
 void init_bitmaps(int fd){
 	unsigned char bitmap_block[PINTFS_BLOCK_SIZE];
+	int i;
 	memset(bitmap_block, 0, PINTFS_BLOCK_SIZE);
+	for(i = 0; i <= PINTFS_ROOT_INO; i++)
+		bitmap_block[i] = 1;
 
 	if (pwrite(fd, bitmap_block, PINTFS_BLOCK_SIZE, PINTFS_BLOCK_SIZE * 1) != PINTFS_BLOCK_SIZE) {
 		perror("Failed to wrtie inode_bitmap");
@@ -46,6 +49,10 @@ void init_bitmaps(int fd){
 		exit(1);
 	}	
 	
+	memset(bitmap_block, 0, PINTFS_BLOCK_SIZE);
+	for(i = 0; i <= PINTFS_FIRST_DATA_BLOCK; i++)
+		bitmap_block[i] = 1;
+
 	if (pwrite(fd, bitmap_block, PINTFS_BLOCK_SIZE, PINTFS_BLOCK_SIZE * 2) != PINTFS_BLOCK_SIZE) {
 		perror("Failed to wrtie block_bitmap");
 		close(fd);
@@ -62,9 +69,9 @@ void init_root_inode_info(int fd)
 {
 	struct pintfs_inode root_inode;
 	
-	root_inode.i_mode = ISDIR;
+	root_inode.i_mode = //TODO: what mode should in here?;
 	root_inode.i_uid = 1000;
-	root_inode.i_size = 0;
+	root_inode.i_size = //TODO: should include . and .. !;
 	root_inode.i_time = time(NULL);
 	for(int i=0; i<PINTFS_N_BLOCKS; i++){
 		if(i == 0)
@@ -91,11 +98,9 @@ void write_root_dir_entry(int fd)
 	struct pintfs_dir_entry dir_entries[2];
 
 	strcpy(dir_entries[0].name, ".");
-	dir_entries[0].size = 0;
 	dir_entries[0].inode_number = PINTFS_ROOT_INO;
 
 	strcpy(dir_entries[1].name, "..");
-	dir_entries[1].size = 0;
 	dir_entries[1].inode_number = PINTFS_ROOT_INO;
 
 	if(pwrite(fd, dir_entries, sizeof(dir_entries), PINTFS_BLOCK_SIZE * PINTFS_FIRST_DATA_BLOCK)

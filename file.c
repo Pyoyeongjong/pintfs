@@ -7,15 +7,14 @@
 #define DEBUG 1
 
 //TODO:
-static ssize_t pint_read(struct file *filp, char __user *buf, size_t count, loff_t *pos)
+static ssize_t pint_read(struct file *filp, char __user *buf, size_t count, loff_t *ppos)
 {
-	struct pintfs_inode filedata;
+	struct buffer_head *bh;
 	struct inode *inode = filp->f_inode;
 	char *start;
-	ssize_t offset, size, size2;
 	int inode_no;
-
 	struct super_block *sb;
+
 	if(DEBUG)
 		printk("pintfs - file read - count: %zu ppos %Ld\n", count, *pos);
 
@@ -29,38 +28,27 @@ static ssize_t pint_read(struct file *filp, char __user *buf, size_t count, loff
 		return -EINVAL;
 	}
 
-	if(*pos > inode->i_size || count <= 0){
+	if(*ppos > inode->i_size || count <= 0){
 		printk("pintfs - attempting to write over the end of a file.\n");
 		return 0;
 	}
 	
 	sb = inode->i_sb;
+	
 	printk("r : readblock\n");	
 	// inode get...
+	bh = sb_bread(sb, PINTFS_I(inode)->i_data[0]);
+
+	start = buf;
+	size = 
 
 	return 0;
 }
 
-/*
 static ssize_t pint_write(struct file *filp, const char __user *buf, size_t count, loff_t *pos)
 {
 	return 0;
 }
-*/
-
-/*
-static int pint_open(struct inode *inode, struct file *filp)
-{
-	return 0;
-}
-*/
-
-/*
-static int pint_release(struct inode *inode, struct file *filp)
-{
-	return 0;
-}
-*/
 
 /*
    FILE_OPERATIONS
@@ -68,8 +56,6 @@ static int pint_release(struct inode *inode, struct file *filp)
 const struct file_operations pintfs_file_ops = {
 	.read = pint_read,
 	.write = pint_write,
-	.open = pint_open,
-	.release = pint_release,
 };
 
 

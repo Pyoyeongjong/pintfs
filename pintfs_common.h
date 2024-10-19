@@ -6,6 +6,7 @@
 #define PINTFS_INODE_SIZE			64
 #define PINTFS_INODE_BITMAP_SIZE	128
 #define PINTFS_BLOCK_BITMAP_SIZE	64
+#define PINTFS_INODES_PER_BLOCK		(PINTFS_BLOCK_SIZE / PINTFS_INODE_SIZE) 
 
 #define PINTFS_SUPER_BLOCK			0
 #define PINTFS_INODE_BITMAP_BLOCK	1
@@ -18,9 +19,6 @@
 #define PINTFS_GOOD_FIRST_INO 2
 
 #define MAX_NAME_SIZE 15
-#define ISDIR	1
-#define ISREG	0
-
 /* 
 	pintfs_super_block - Superblock Metadata (It is on 0 block)
 */
@@ -50,13 +48,23 @@ struct pintfs_sb_info {
 /*
    pintfs_inode
 */
+#define ISDIR	1
+#define ISREG	0
 struct pintfs_inode {
 	int i_mode;		/* File mode */
 	int i_uid;		/* Low 16 bits of Owner Uid */
 	ssize_t i_size;		/* Size in bytes */
 	long long i_time;		/* Access, Create, Modificate, or Deletion Time */
-	unsigned int i_block[PINTFS_N_BLOCKS]; /* Direct Block List */
-	unsigned int i_blocks; /* Indirect Block List - UNUSED */
+	unsigned int i_block[PINTFS_N_BLOCKS]; /* Direct 0~9, Indirect 10 */
+	unsigned int i_blocks; /* How many blocks this inode uses */
+};
+
+/*
+   pintfs_inode_info
+*/
+struct pintfs_inode_info {
+	unsigned int	i_data[15];
+	struct inode	vfs_inode;
 };
 
 /*
@@ -64,7 +72,6 @@ struct pintfs_inode {
 */
 struct pintfs_dir_entry{
 	char name[MAX_NAME_SIZE];
-	int size;
 	int inode_number;
 };
 

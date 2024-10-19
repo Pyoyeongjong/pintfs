@@ -11,6 +11,28 @@
 #include <linux/buffer_head.h>
 
 #define DEBUG 1
+
+/*
+	pintfs_alloc_inode - alloc pintfs_inode_info
+*/
+static struct inode *pintfs_alloc_inode(struct super_block *sb)
+{
+	struct pintfs_inode_info *pi;
+	pi = kzalloc(sizeof(struct pintfs_inode_info), GFP_KERNEL);
+
+	if(!pi)
+		return NULL;
+
+	inode_set_iversion(&pi->vfs_inode, 1);
+	return &pi->vfs_inode;
+}
+
+static void pintfs_free_inode(struct inode *inode)
+{
+	kfree(PINTFS_I(inode));
+}
+
+
 /*
 	pintfs_put_super - remove memory of super_block
 */
@@ -42,6 +64,8 @@ static int pintfs_statfs(struct dentry *dentry, struct kstatfs *buf)
 	SUPER_OPERATIONS
 */
 const struct super_operations pintfs_super_ops = {
+	.alloc_inode = pintfs_alloc_inode,
+	.free_inode = pintfs_free_inode,
 	.put_super = pintfs_put_super,	
 	.statfs = pintfs_statfs,
 };
@@ -64,6 +88,7 @@ static int pintfs_fill_super(struct super_block *sb, void *data, int silent)
 	if(!sbi)
 		goto failed;
 	
+	// get pintfs_super_block!
 	bh = sb_bread(sb, sb_block);
 	if(!bh)
 		goto failed_sbi;
@@ -76,29 +101,19 @@ static int pintfs_fill_super(struct super_block *sb, void *data, int silent)
 		goto failed_bh;
 	memcpy(sbi->s_es, ps, sizeof(struct pintfs_super_block));
 	sbi->s_first_ino = PINTFS_GOOD_FIRST_INO;
-	sbi->s_inode_size = PINTfS_INODE_SIZE;
+	sbi->s_inode_size = PINTFS_INODE_SIZE;
 
 	sb->s_magic = ps->magic;
 	// Here is a problem!
 	// super_operations no Implementation -> ERROR!
 	sb->s_op = &pintfs_super_ops;
 
-	root = new_inode(sb);
+	root = pintfs_iget(sb, PINTFS_ROOT_INO);
 	if(!root){
 		ret = -ENOMEM;
 		goto failed_s_es;
 	}
 	
-	root->i_ino = PINTFS_ROOT_INO;
-	/* inode_init_owner(&init_user_ns, root, NULL, 
-			(S_IFDIR | S_IRUGO | S_IWUGO | S_IXUGO)); */
-	root->i_sb = sb;
-	root->i_op = &pintfs_dir_inode_ops;
-	root->i_fop = &pintfs_dir_ops;
-	root->i_atime = root->i_mtime = root->i_ctime = current_time(root);
-	root->i_mode = S_IFDIR | 0755;
-	root->i_flags = 0;
-
 	// setting root directory
 	sb->s_root = d_make_root(root);
 	if(!sb->s_root) {
