@@ -1,10 +1,13 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/types.h>
+#include <linux/buffer_head.h>
 
 #include "pintfs.h"
 
 #define DEBUG 1
+
+
 /*
    pintfs_create - create a new file in a directory
 */
@@ -15,7 +18,7 @@ static int pintfs_create(struct inode *dir, struct dentry* dentry, umode_t mode,
 	int err;
 	struct buffer_head *bh;
 	struct pintfs_dir_entry *pde;
-	int i;
+	int i, num_dirs;
 	if (DEBUG)
 		printk("pintfs - create\n");
 
@@ -23,13 +26,13 @@ static int pintfs_create(struct inode *dir, struct dentry* dentry, umode_t mode,
 	if(!inode)
 		return -ENOSPC;
 	
-	inode->i_op = &pintfs_file_inode_operations;
-	inode->i_fop = &pintfs_file_operations;
+	inode->i_op = &pintfs_file_inode_ops;
+	inode->i_fop = &pintfs_file_ops;
 	inode->i_mode = mode;
 
 	// Write pintfs_dir_entry in dir!
-	bh = sb_bread(dir->i_sb, PINTFS_I(dir)->i_block[0]); 
-	num_dirs = PINTFS_BLOCK_SIZE / sizeof(struct pintfs_dir_entry);
+	bh = pintfs_sb_bread_dir(dir); 
+	num_dirs = NUM_DIRS;
 	pde = (struct pintfs_dir_entry *)((bh->b_data));
 	for(i=0; i<num_dirs; i++){
 		if (pde->inode_number == 0){
@@ -40,7 +43,7 @@ static int pintfs_create(struct inode *dir, struct dentry* dentry, umode_t mode,
 	if(i == num_dirs){
 		brelse(bh);
 		iput(inode);
-		return -ENOSPC:
+		return -ENOSPC;
 	}
 
 	strncpy(pde->name, dentry->d_name.name, dentry->d_name.len);
@@ -61,7 +64,7 @@ static int pintfs_create(struct inode *dir, struct dentry* dentry, umode_t mode,
 /*
    pintfs_lookup - find pintfs_dir_entry
 */
-static struct dentry *pint_lookup(struct inode *dir, 
+static struct dentry *pintfs_lookup(struct inode *dir, 
 		struct dentry *dentry, unsigned int flags)
 {
 
@@ -73,11 +76,11 @@ static struct dentry *pint_lookup(struct inode *dir,
 	if(DEBUG)
 		printk("pintfs - lookup\n");
 
-	bh = sb_bread(dir->i_sb, PINTFS_I(dir)->i_data[0]);
+	bh = pintfs_sb_bread_dir(dir); 
 	if(!bh)
 		return ERR_PTR(-EIO);
 
-	num_dirs = PINTFS_BLOC_SIZE / sizeof(struct pintfs_dir_entry);
+	num_dirs = PINTFS_BLOCK_SIZE / sizeof(struct pintfs_dir_entry);
 	
 	for(i=0; i<num_dirs; i++){
 		pde = (struct pintfs_dir_entry *)((bh->b_data) + i*sizeof(struct pintfs_dir_entry));
@@ -105,10 +108,10 @@ static struct dentry *pint_lookup(struct inode *dir,
 	return NULL;
 }
 
-static int pint_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
+static int pintfs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
 {
 	struct inode *inode;
-	struct buffe_head *bh;
+	struct buffer_head *bh;
 	int num_dirs, i;
 	struct pintfs_dir_entry *pde;
 	if(DEBUG)
@@ -118,15 +121,15 @@ static int pint_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
 	inode = pintfs_new_inode(dir, S_IFDIR | mode);
 	if(!inode)
 		return -ENOSPC;
-	inode->i_op = &pintfs_dir_inode_operations;
-	inode->i_fop = &pintfs_dir_operations;
+	inode->i_op = &pintfs_dir_inode_ops;
+	inode->i_fop = &pintfs_dir_ops;
 	inode->i_mode = S_IFDIR | mode;
 
 	if (!dir)
 		return -1;
 	
-	bh = sb_bread(dir->i_sb, PINTFS_I(dir)->i_data[0]);
-	num_dirs = PINTFS_BLOCK_SIZE / sizeof(pintfs_dir_entry);
+	bh = pintfs_sb_bread_dir(dir); 
+	num_dirs = PINTFS_BLOCK_SIZE / sizeof(struct pintfs_dir_entry);
 
 	for(i=0; i<num_dirs; i++){
 		pde = (struct pintfs_dir_entry *)((bh->b_data) + i*sizeof(struct pintfs_dir_entry));
@@ -139,7 +142,7 @@ static int pint_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
 	pde->inode_number = inode->i_ino;
 
 	mark_buffer_dirty(bh);
-	sync_dirty_bhffer(bh);
+	sync_dirty_buffer(bh);
 	brelse(bh);
 
 	d_instantiate(dentry, inode);
@@ -149,37 +152,57 @@ static int pint_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
 	return 0;
 }
 
+//TODO: later.. 10.13	
 static int pintfs_unlink(struct inode *dir, struct dentry *dentry)
 {
 	struct buffer_head *bh;
-	int num_dirs, i;
-	struct pintfs_dir_entry *pde;
+	struct inode *inode;
+	int num_dirs, i, k;
+	struct pintfs_dir_entry *pde, *dent1, *dent2;
 	if(DEBUG)
 		printk("pintfs - unlink\n");
 
-	bh = sb_bread(dir->i_sb, PINTFS_I(dir)->i_data[0]);
+	bh = pintfs_sb_bread_dir(dir); 
 	num_dirs =  PINTFS_BLOCK_SIZE / sizeof(struct pintfs_dir_entry);
 
 	for(i=0; i<num_dirs; i++){
 		pde = (struct pintfs_dir_entry *)((bh->b_data) + i*sizeof(struct pintfs_dir_entry));
 		if(strlen(pde->name) == dentry->d_name.len &&
-				strncmp(pde->name, dentry->d_name.name) == 0){
+				strncmp(pde->name, dentry->d_name.name, dentry->d_name.len) == 0){
 			inode = pintfs_iget(dir->i_sb, pde->inode_number);
 			if(!inode)
 				return -ENONET;
-			remove_unused_inodes(inode->i_sb, inode->i_ino);
-			//TODO: later.. 10.13	
+
+			dir->i_size -= sizeof(struct pintfs_dir_entry);
+			for(k=i+1; k< num_dirs; k++){
+				dent1 = (struct pintfs_dir_entry *) ((bh->b_data) + (k-1)*sizeof(struct pintfs_dir_entry));
+				dent2 = (struct pintfs_dir_entry *) ((bh->b_data) + (k)*sizeof(struct pintfs_dir_entry));
+				strcpy(dent1->name, dent2->name);
+				dent1->inode_number = dent2->inode_number;
+			}
+			
+			mark_buffer_dirty(bh);
+			sync_dirty_buffer(bh);	
+			pintfs_write_inode(dir->i_sb, dir);
+
+			mark_inode_dirty(dir);
+			inode_dec_link_count(inode);
+
+			brelse(bh);
+			return 0;
 		}
 	}
+	brelse(bh);
+	return -ENOENT;
 }
 
 
-static int pint_rmdir(struct inode *inode, struct dentry *dentry)
+static int pintfs_rmdir(struct inode *dir, struct dentry *dentry)
 {
 	struct inode *inode = d_inode(dentry);
 	int err = -ENOTEMPTY;
 
-	if(pintfs_emtpy_dir(inode)){
+	if(pintfs_empty_dir(inode)){
 		err = pintfs_unlink(dir, dentry);
 		if(!err) {
 			inode->i_size = 0;
@@ -187,7 +210,11 @@ static int pint_rmdir(struct inode *inode, struct dentry *dentry)
 		}
 	}
 	return err;
-	
+}
+
+// tunrcate ???
+static int pintfs_setattr(struct dentry *dentry, struct iattr *iattr)
+{
 	return 0;
 }
 

@@ -3,6 +3,7 @@
 #include <linux/types.h>
 #include <linux/buffer_head.h>
 #include <linux/fs.h>
+#include <linux/stat.h>
 #include <linux/time64.h>
 
 #include "pintfs.h"
@@ -11,20 +12,23 @@
 
 /* inode_bitmap functions */
 
-int set_inode_bitmap(struct super_block *sb, int ino, int val)
+int set_bitmap(struct super_block *sb, int bno, int no, int val)
 {
 	struct buffer_head *bh;
-	int block_no = pintfs_get_blocknum(ino);
 	struct pintfs_super_block *psb = PINTFS_SB(sb)->s_es;
 
-	if(ino >= psb->inodes_count)
+	if(bno == psb->inode_bitmap_block && no >= psb->inodes_count)
 		return -1;
+	else if(bno == psb->block_bitmap_block && no >= psb->blocks_count)
+		return -1;
+	else
+		return -EINVAL;
 
-	bh = sb_bread(sb, ino);
+	bh = sb_bread(sb, bno);
 	if(!bh)
 		return -EINVAL;
 
-	bh->b_data[ino] = val;
+	bh->b_data[no] = val;
 
 	mark_buffer_dirty(bh);
 	sync_dirty_buffer(bh);
@@ -67,51 +71,13 @@ static int pintfs_empty_inode(struct super_block *sb)
 }
 
 
-/*
-   이거 필요함?? 생각을 해봐야함
-*/
-int remove_unused_inodes(struct super_block *sb, int inode_no)
-{
-	if (inode_no == -1)
-		return 0;
 
-	struct pintfs_inode *pi;
-}
-/*
-	pintfs_write_inode - Write pintfs_inode in block device
-*/
-// TODO: You must write pintfs_inode_info data in disk!!
-static int pintfs_write_inode(struct super_block *sb, int inum, struct pintfs_inode* pinode)
-{
-	struct buffer_head *bh;
-
-	if(DEBUG)
-		printk("pintfs - write_inode in block device (inum:%d)\n", inum);
-
-	bh = sb_bread(sb, pintfs_get_blocknum(inum));
-	if(!bh)
-		return -ENOSPC;
-	memcpy(bh->b_data, pinode, PINTFS_INODE_SIZE);
-	mark_buffer_dirty(bh);
-	sync_dirty_buffer(bh);
-	brelse(bh);
-
-	if(DEBUG)
-		printk("pintfs - write_inode done (inum=%d)\n", inum);
-	return PINTFS_INODE_SIZE;	
-}
-
-
-/* 
-	pintfs_empty_inode - Seek inode bitmap and return smallest available ino
-*/
 
 /*
 	pintfs_new_inode - Make new pintfs_inode and record in disk
 */
-static struct inode *pintfs_new_inode(const struct inode *dir, umode_t mode)
+struct inode *pintfs_new_inode(const struct inode *dir, umode_t mode)
 {
-	struct pintfs_inode pinode;
 	struct super_block *sb;
 	struct inode *inode;
 	int new_ino;
@@ -135,20 +101,18 @@ static struct inode *pintfs_new_inode(const struct inode *dir, umode_t mode)
 		return NULL;
 	}
 
-	set_inode_bitmap(sb, new_ino, 1);
+	set_bitmap(sb, PINTFS_INODE_BITMAP_BLOCK, new_ino, 1);
 	inode_init_owner(inode, dir, mode);
 	cur_time = current_time(inode);
 
-	pinode.i_mode = mode;
-	pinode.i_uid = i_uid_read(inode);
-	pinode.i_size = 0;
-	pinode.i_time = cur_time.tv_sec;
+	inode->i_ino = new_ino;
+	inode->i_mode = mode;
+	inode->i_size = 0;
+	inode->i_ctime = inode-> i_mtime = inode->i_atime = cur_time;
 
 	// Write pintfs_inode in disk!
-	pintfs_write_inode(sb, new_ino, &pinode);
+	pintfs_write_inode(sb, inode);
 
-	inode->i_ino = new_ino;
-	inode->i_ctime = inode-> i_mtime = inode->i_atime = cur_time;
 	insert_inode_hash(inode);
 	return inode;
 }
@@ -199,7 +163,7 @@ struct inode *pintfs_iget(struct super_block *sb, unsigned long ino)
 	gid_t i_gid;
 	int i;
 
-	inode = new_inode(sb);
+	inode = iget_locked(sb, ino);
 	if(!inode)
 		return ERR_PTR(-ENOMEM);
 	if(!(inode->i_state & I_NEW))
@@ -213,7 +177,7 @@ struct inode *pintfs_iget(struct super_block *sb, unsigned long ino)
 
 	inode->i_ino = ino;
 	inode->i_sb = sb;
-	if(raw_inode->i_mode){
+	if(S_ISDIR(raw_inode->i_mode)){
 		inode->i_op = &pintfs_dir_inode_ops;
 		inode->i_fop = &pintfs_dir_ops;
 	}
@@ -228,13 +192,10 @@ struct inode *pintfs_iget(struct super_block *sb, unsigned long ino)
 	i_uid_write(inode, i_uid);
 	i_gid_write(inode, i_gid);
 	
-	//set_nlink() - it is for link
 	inode->i_size = raw_inode->i_size;
 	inode->i_atime.tv_sec = raw_inode->i_time;
 	inode->i_ctime.tv_sec = raw_inode->i_time;
 	inode->i_mtime.tv_sec = raw_inode->i_time;
-
-	inode->i_flags = 0;
 
 	pi = PINTFS_I(inode);	
 	for(i=0; i<PINTFS_N_BLOCKS; i++){

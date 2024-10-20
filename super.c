@@ -7,17 +7,53 @@
 #include <linux/pagemap.h>
 #include <linux/highmem.h>
 #include <linux/iversion.h>
+#include <linux/uidgid.h>
 #include "pintfs.h"
 #include <linux/buffer_head.h>
 
 #define DEBUG 1
+/*
+	pintfs_write_inode - Write pintfs_inode in block device
+*/
+// TODO: You must write pintfs_inode_info data in disk!!
+int pintfs_write_inode(struct super_block *sb, struct inode* inode)
+{
+	struct buffer_head *bh;
+	struct pintfs_inode pinode;
+	struct pintfs_inode_info *pii = PINTFS_I(inode);
+	int inum = inode->i_ino;
+	if(DEBUG)
+		printk("pintfs - write_inode in block device (inum:%d)\n", inum);
 
+	pinode.i_mode = inode->i_mode;
+	pinode.i_uid = from_kuid(&init_user_ns, inode->i_uid);  // 변환 후 저장
+	pinode.i_size = inode->i_size;
+	pinode.i_time = inode->i_mtime.tv_sec;
+	memcpy(pinode.i_block, pii->i_data, PINTFS_N_BLOCKS);
+	pinode.i_blocks = inode->i_blocks;
+
+	bh = sb_bread(sb, pintfs_get_blocknum(inum));
+	if(!bh)
+		return -ENOSPC;
+	memcpy(bh->b_data + inum*sizeof(struct pintfs_inode), &pinode, sizeof(struct pintfs_inode));
+	mark_buffer_dirty(bh);
+	sync_dirty_buffer(bh);
+	brelse(bh);
+
+	if(DEBUG)
+		printk("pintfs - write_inode done (inum=%d)\n", inum);
+	return PINTFS_INODE_SIZE;	
+}
 /*
 	pintfs_alloc_inode - alloc pintfs_inode_info
 */
 static struct inode *pintfs_alloc_inode(struct super_block *sb)
 {
 	struct pintfs_inode_info *pi;
+	
+	if (DEBUG)
+		printk("pintfs - alloc_inode\n");
+
 	pi = kzalloc(sizeof(struct pintfs_inode_info), GFP_KERNEL);
 
 	if(!pi)
@@ -29,6 +65,8 @@ static struct inode *pintfs_alloc_inode(struct super_block *sb)
 
 static void pintfs_free_inode(struct inode *inode)
 {
+	if (DEBUG)
+		printk("pintfs - free_inode\n");
 	kfree(PINTFS_I(inode));
 }
 
@@ -76,13 +114,14 @@ const struct super_operations pintfs_super_ops = {
 static int pintfs_fill_super(struct super_block *sb, void *data, int silent)
 {
 	struct pintfs_sb_info *sbi;
-	struct pintfs_super_block *ps;
+	struct pintfs_super_block *psb;
 	unsigned long sb_block = PINTFS_SUPER_BLOCK;		/* Default location */
 	struct inode *root;
 	long ret = -ENOMEM;
 	struct buffer_head *bh;
 
-	if (DEBUG) printk("pintfs - fill_super\n");
+	if (DEBUG)
+		printk("pintfs - fill_super\n");
 
 	sbi = kzalloc(sizeof(*sbi), GFP_KERNEL);
 	if(!sbi)
@@ -94,18 +133,15 @@ static int pintfs_fill_super(struct super_block *sb, void *data, int silent)
 		goto failed_sbi;
 
 	sb->s_fs_info = sbi;
-	//s_es must be initialized as soon as possible! << from ext2.h
-	ps = (struct pintfs_super_block *) (((char *)bh->b_data));
+	psb = (struct pintfs_super_block *) (((char *)bh->b_data));
 	sbi->s_es = kzalloc(sizeof(struct pintfs_super_block), GFP_KERNEL);
 	if(!sbi->s_es)
 		goto failed_bh;
-	memcpy(sbi->s_es, ps, sizeof(struct pintfs_super_block));
+	memcpy(sbi->s_es, psb, sizeof(struct pintfs_super_block));
 	sbi->s_first_ino = PINTFS_GOOD_FIRST_INO;
 	sbi->s_inode_size = PINTFS_INODE_SIZE;
 
-	sb->s_magic = ps->magic;
-	// Here is a problem!
-	// super_operations no Implementation -> ERROR!
+	sb->s_magic = psb->magic;
 	sb->s_op = &pintfs_super_ops;
 
 	root = pintfs_iget(sb, PINTFS_ROOT_INO);

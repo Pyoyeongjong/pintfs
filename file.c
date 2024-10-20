@@ -16,7 +16,7 @@ static ssize_t pint_read(struct file *filp, char __user *buf, size_t count, loff
 	struct super_block *sb;
 
 	if(DEBUG)
-		printk("pintfs - file read - count: %zu ppos %Ld\n", count, *pos);
+		printk("pintfs - file read - count: %zu ppos %Ld\n", count, *ppos);
 
 	if(!inode){
 		printk("pintfs - Problem with file inode\n");
@@ -40,7 +40,6 @@ static ssize_t pint_read(struct file *filp, char __user *buf, size_t count, loff
 	bh = sb_bread(sb, PINTFS_I(inode)->i_data[0]);
 
 	start = buf;
-	size = 
 
 	return 0;
 }
