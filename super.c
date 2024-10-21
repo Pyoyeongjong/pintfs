@@ -98,12 +98,14 @@ static int pintfs_statfs(struct dentry *dentry, struct kstatfs *buf)
 	return 0;
 }
 
+
 /*
 	SUPER_OPERATIONS
 */
 const struct super_operations pintfs_super_ops = {
 	.alloc_inode = pintfs_alloc_inode,
 	.free_inode = pintfs_free_inode,
+	.evict_inode = pintfs_evict_inode,
 	.put_super = pintfs_put_super,	
 	.statfs = pintfs_statfs,
 };

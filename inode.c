@@ -70,8 +70,25 @@ static int pintfs_empty_inode(struct super_block *sb)
 	return result;
 }
 
+void pintfs_evict_inode(struct inode *inode)
+{
+	struct pintfs_inode_info *pii;
+	struct super_block *sb;
+	int ino, i;
 
+	pii = PINTFS_I(inode);
+	ino = inode->i_ino;
+	sb = inode->i_sb;
 
+	for(i=0; i<PINTFS_N_BLOCKS; i++)
+	{
+		if(pii->i_data[i] > 0)
+			set_bitmap(sb, PINTFS_BLOCK_BITMAP_BLOCK, pii->i_data[i], 0);
+	}
+
+	set_bitmap(sb, PINTFS_INODE_BITMAP_BLOCK, ino, 0);
+	mark_inode_dirty(inode);
+}
 
 /*
 	pintfs_new_inode - Make new pintfs_inode and record in disk
@@ -212,17 +229,9 @@ bad_inode:
 }
 
 /*
-	pintfs_setattr
-*/
-static int pintfs_setattr(struct dentry *dentry, struct iattr *iattr)
-{
-	return 0;
-}
-/*
    INODE_OPERATIONS
 */
 const struct inode_operations pintfs_file_inode_ops = {
-	.setattr	=	pintfs_setattr,
 };
 
 

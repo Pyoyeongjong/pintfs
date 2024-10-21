@@ -1,3 +1,3 @@
 obj-m += pintfs.o
-pintfs-objs := file.o inode.o super.o dir.o namei.o
+pintfs-objs := balloc.o file.o inode.o super.o dir.o namei.o
 

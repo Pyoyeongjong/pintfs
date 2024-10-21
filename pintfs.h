@@ -5,15 +5,19 @@
 #include "pintfs_common.h"
 
 #define NUM_DIRS (PINTFS_BLOCK_SIZE / sizeof(struct pintfs_dir_entry))
+/* balloc.c */
+int pintfs_empty_block(struct super_block *sb);
 /* super.c */
 extern const struct super_operations pintfs_super_ops;
 int pintfs_write_inode(struct super_block *sb, struct inode* inode);
 /* file.c */
 extern const struct file_operations pintfs_file_ops;
 /* inode.c */
+int set_bitmap(struct super_block *sb, int bno, int no, int val);
 extern const struct inode_operations pintfs_file_inode_ops;
 struct inode *pintfs_iget(struct super_block *sb, unsigned long ino);
 struct inode *pintfs_new_inode(const struct inode *dir, umode_t mode);
+void pintfs_evict_inode(struct inode *inode);
 /* dir_c */
 extern const struct file_operations pintfs_dir_ops;
 int pintfs_empty_dir(struct inode *inode);
@@ -38,7 +42,16 @@ static inline struct pintfs_inode_info *PINTFS_I(struct inode* inode)
 
 static inline struct buffer_head *pintfs_sb_bread_dir(struct inode* inode)
 {	
-	return sb_bread(inode->i_sb, PINTFS_I(inode->i_ino)->i_data[0]);
+	return sb_bread(inode->i_sb, PINTFS_I(inode)->i_data[0]);
+}
+
+static inline struct buffer_head *pintfs_sb_bread_file(struct inode* inode, int block_index)
+{
+	int block_no = PINTFS_I(inode)->i_data[block_index];
+	if(block_no <= 0)
+		return NULL;
+	else
+		return sb_bread(inode->i_sb, PINTFS_I(inode)->i_data[block_no]);	
 }
 
 

@@ -4,7 +4,7 @@
 
 #include "pintfs.h"
 
-static int pintfs_empty_block(struct super_block *sb)
+int pintfs_empty_block(struct super_block *sb)
 {
 	struct pintfs_sb_info *sbi;
 	struct pintfs_super_block *psb;
