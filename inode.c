@@ -3,41 +3,69 @@
 #include <linux/types.h>
 #include <linux/buffer_head.h>
 #include <linux/fs.h>
+#include <linux/iversion.h>
+#include <linux/slab.h>
 #include <linux/stat.h>
 #include <linux/time64.h>
+#include <linux/module.h>
 
 #include "pintfs.h"
 
 #define DEBUG 1
-
-/* inode_bitmap functions */
-
-int set_bitmap(struct super_block *sb, int bno, int no, int val)
+/*
+	pintfs_write_inode - Write pintfs_inode in block device
+*/
+int pintfs_write_inode(struct super_block *sb, struct inode* inode)
 {
 	struct buffer_head *bh;
-	struct pintfs_super_block *psb = PINTFS_SB(sb)->s_es;
+	struct pintfs_inode pinode;
+	struct pintfs_inode_info *pii = PINTFS_I(inode);
+	int inum = inode->i_ino;
+	if(DEBUG)
+		printk("pintfs - write_inode in block device (inum:%d)\n", inum);
 
-	if(bno == psb->inode_bitmap_block && no >= psb->inodes_count)
-		return -1;
-	else if(bno == psb->block_bitmap_block && no >= psb->blocks_count)
-		return -1;
-	else
-		return -EINVAL;
+	pinode.i_mode = inode->i_mode;
+	pinode.i_uid = from_kuid(&init_user_ns, inode->i_uid);  // 변환 후 저장
+	pinode.i_size = inode->i_size;
+	pinode.i_time = inode->i_mtime.tv_sec;
+	memcpy(pinode.i_block, pii->i_data, PINTFS_N_BLOCKS);
+	pinode.i_blocks = inode->i_blocks;
 
-	bh = sb_bread(sb, bno);
+	bh = sb_bread(sb, pintfs_get_blocknum(inum));
 	if(!bh)
-		return -EINVAL;
-
-	bh->b_data[no] = val;
-
+		return -ENOSPC;
+	memcpy(bh->b_data + inum*sizeof(struct pintfs_inode), &pinode, sizeof(struct pintfs_inode));
 	mark_buffer_dirty(bh);
 	sync_dirty_buffer(bh);
 	brelse(bh);
 
-	return 0;
+	if(DEBUG)
+		printk("pintfs - write_inode done (inum=%d)\n", inum);
+	return PINTFS_INODE_SIZE;	
+}
+/*
+	pintfs_alloc_inode - alloc pintfs_inode_info
+*/
+struct inode *pintfs_alloc_inode(struct super_block *sb)
+{
+	struct pintfs_inode_info *pi;
+	
+	if (DEBUG)
+		printk("pintfs - alloc_inode\n");
+
+	pi = kzalloc(sizeof(struct pintfs_inode_info), GFP_KERNEL);
+
+	if(!pi){
+		printk("pintfs - pi is null!\n");
+		return NULL;
+	}
+	inode_set_iversion(&pi->vfs_inode, 1);
+	if (DEBUG)
+		printk("pintfs - alloc ok!\n");
+	return &pi->vfs_inode;
 }
 
-static int pintfs_empty_inode(struct super_block *sb)
+int pintfs_empty_inode(struct super_block *sb)
 {
 	struct pintfs_sb_info *sbi;
 	struct pintfs_super_block *psb;
@@ -68,6 +96,13 @@ static int pintfs_empty_inode(struct super_block *sb)
 	
 	brelse(bh);
 	return result;
+}
+
+void pintfs_free_inode(struct inode *inode)
+{
+	if (DEBUG)
+		printk("pintfs - free inode\n");
+	kfree(PINTFS_I(inode));
 }
 
 void pintfs_evict_inode(struct inode *inode)
@@ -180,6 +215,9 @@ struct inode *pintfs_iget(struct super_block *sb, unsigned long ino)
 	gid_t i_gid;
 	int i;
 
+	if (DEBUG)
+		printk("pintfs - pintfs_iget\n");
+
 	inode = iget_locked(sb, ino);
 	if(!inode)
 		return ERR_PTR(-ENOMEM);
@@ -187,6 +225,7 @@ struct inode *pintfs_iget(struct super_block *sb, unsigned long ino)
 		return inode;
 
 	raw_inode = pintfs_get_inode(inode->i_sb, ino, &bh);
+	print_pintfs_inode(raw_inode);
 	if(IS_ERR(raw_inode)) {
 		ret = PTR_ERR(raw_inode);
 		goto bad_inode;
@@ -219,6 +258,9 @@ struct inode *pintfs_iget(struct super_block *sb, unsigned long ino)
 		pi->i_data[i] = raw_inode->i_block[i];
 	}
 
+	if (DEBUG)
+		printk("pintfs - pintfs_iget ok, inode=%p\n", inode);
+
 	brelse(bh);
 	return inode;
 
@@ -228,10 +270,16 @@ bad_inode:
 	return ERR_PTR(ret);
 }
 
+
+static int pintfs_setattr(struct dentry *dentry, struct iattr *attr){
+	return 0;
+}
+
 /*
    INODE_OPERATIONS
 */
 const struct inode_operations pintfs_file_inode_ops = {
+	.setattr = pintfs_setattr,
 };
 
 

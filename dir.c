@@ -35,45 +35,46 @@ int pintfs_empty_dir(struct inode *inode)
 /*
    pintfs_readdir - 중단된다면 중간 ctx->pos부터 탐색이 가능하게 만들어야 한다!
 */
-static int 
-pintfs_readdir(struct file *filp, struct dir_context *ctx)
+static int pintfs_readdir(struct file *filp, struct dir_context *ctx)
 {	
-	struct inode *i = file_inode(filp);
-	struct pintfs_inode_info *pi = PINTFS_I(i);
+	struct inode *i;
 	struct pintfs_super_block *psb = PINTFS_SB(i->i_sb)->s_es;
 	int num_dirs, k;
 	struct pintfs_dir_entry *de;
 	struct buffer_head *bh;
 	unsigned long offset; // this is for iterating
-	unsigned long blocksize;
-	unsigned long nblocks;
-	unsigned long block_no;
+	unsigned long block_no = 0;
 
 	if(DEBUG)
 		printk("pintfs - readdir\n");
 	
+
+	i = file_inode(filp);
 	bh = pintfs_sb_bread_dir(i);
 	if(!bh){
 		return -EIO;
 	}
 	num_dirs = NUM_DIRS;
-	blocksize = psb->block_size;
-	nblocks = i->i_blocks;
+	offset = 0;
 
-	for( ; block_no < nblocks; block_no++){		
-		for(k=0; k<num_dirs; k++){
-			de = (struct pintfs_dir_entry *)(bh->b_data + offset);
-			if(de->inode_number){
-				if(!dir_emit(ctx, de->name, strnlen(de->name, MAX_NAME_SIZE), de->inode_number,
-							DT_UNKNOWN)){
-					brelse(bh);
-					return -EINVAL;
-				}
+	for(k=0; k<num_dirs; k++){
+		de = (struct pintfs_dir_entry *)(bh->b_data + offset);
+		if(de->inode_number){
+			printk("readdir - inode_number=%d\n",de->inode_number);
+			if(!dir_emit(ctx, de->name, strnlen(de->name, MAX_NAME_SIZE), de->inode_number,
+						DT_UNKNOWN)){
+				brelse(bh);
+				return 0;
 			}
-			ctx->pos += sizeof(struct pintfs_dir_entry);
-		}			
+		}
+		ctx->pos += sizeof(struct pintfs_dir_entry);
+		offset += sizeof(struct pintfs_dir_entry);
 	}
+
 	brelse(bh);
+
+	if(DEBUG)
+		printk("pintfs - readdir done\n");
 	return 0;
 }
 

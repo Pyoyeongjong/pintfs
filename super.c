@@ -8,68 +8,34 @@
 #include <linux/highmem.h>
 #include <linux/iversion.h>
 #include <linux/uidgid.h>
-#include "pintfs.h"
 #include <linux/buffer_head.h>
 
+#include "pintfs.h"
 #define DEBUG 1
-/*
-	pintfs_write_inode - Write pintfs_inode in block device
-*/
-// TODO: You must write pintfs_inode_info data in disk!!
-int pintfs_write_inode(struct super_block *sb, struct inode* inode)
+int set_bitmap(struct super_block *sb, int bno, int no, int val)
 {
 	struct buffer_head *bh;
-	struct pintfs_inode pinode;
-	struct pintfs_inode_info *pii = PINTFS_I(inode);
-	int inum = inode->i_ino;
-	if(DEBUG)
-		printk("pintfs - write_inode in block device (inum:%d)\n", inum);
+	struct pintfs_super_block *psb = PINTFS_SB(sb)->s_es;
 
-	pinode.i_mode = inode->i_mode;
-	pinode.i_uid = from_kuid(&init_user_ns, inode->i_uid);  // 변환 후 저장
-	pinode.i_size = inode->i_size;
-	pinode.i_time = inode->i_mtime.tv_sec;
-	memcpy(pinode.i_block, pii->i_data, PINTFS_N_BLOCKS);
-	pinode.i_blocks = inode->i_blocks;
+	if(bno == psb->inode_bitmap_block && no >= psb->inodes_count)
+		return -1;
+	else if(bno == psb->block_bitmap_block && no >= psb->blocks_count)
+		return -1;
+	else
+		return -EINVAL;
 
-	bh = sb_bread(sb, pintfs_get_blocknum(inum));
+	bh = sb_bread(sb, bno);
 	if(!bh)
-		return -ENOSPC;
-	memcpy(bh->b_data + inum*sizeof(struct pintfs_inode), &pinode, sizeof(struct pintfs_inode));
+		return -EINVAL;
+
+	bh->b_data[no] = val;
+
 	mark_buffer_dirty(bh);
 	sync_dirty_buffer(bh);
 	brelse(bh);
 
-	if(DEBUG)
-		printk("pintfs - write_inode done (inum=%d)\n", inum);
-	return PINTFS_INODE_SIZE;	
+	return 0;
 }
-/*
-	pintfs_alloc_inode - alloc pintfs_inode_info
-*/
-static struct inode *pintfs_alloc_inode(struct super_block *sb)
-{
-	struct pintfs_inode_info *pi;
-	
-	if (DEBUG)
-		printk("pintfs - alloc_inode\n");
-
-	pi = kzalloc(sizeof(struct pintfs_inode_info), GFP_KERNEL);
-
-	if(!pi)
-		return NULL;
-
-	inode_set_iversion(&pi->vfs_inode, 1);
-	return &pi->vfs_inode;
-}
-
-static void pintfs_free_inode(struct inode *inode)
-{
-	if (DEBUG)
-		printk("pintfs - free_inode\n");
-	kfree(PINTFS_I(inode));
-}
-
 
 /*
 	pintfs_put_super - remove memory of super_block
@@ -85,6 +51,8 @@ static void pintfs_put_super(struct super_block *sb)
 	kfree(ps);
 	kfree(sbi);
 	sb->s_fs_info = NULL;
+	if(DEBUG)
+		printk("pintfs - put_super ok\n");
 	return;
 }
 
@@ -122,6 +90,7 @@ static int pintfs_fill_super(struct super_block *sb, void *data, int silent)
 	long ret = -ENOMEM;
 	struct buffer_head *bh;
 
+
 	if (DEBUG)
 		printk("pintfs - fill_super\n");
 
@@ -151,7 +120,8 @@ static int pintfs_fill_super(struct super_block *sb, void *data, int silent)
 		ret = -ENOMEM;
 		goto failed_s_es;
 	}
-	
+
+	sb->s_blocksize = PINTFS_BLOCK_SIZE;
 	// setting root directory
 	sb->s_root = d_make_root(root);
 	if(!sb->s_root) {
@@ -160,6 +130,8 @@ static int pintfs_fill_super(struct super_block *sb, void *data, int silent)
 	}
 
 	brelse(bh);
+	if(DEBUG)
+		printk("pintfs - fill super ok!\n");
 	return 0;
 
 failed_inode:
@@ -172,6 +144,7 @@ failed_sbi:
 	sb->s_fs_info = NULL;
 	kfree(sbi);
 failed:
+	printk("pintfs - fill super not ok!\n");
 	return ret;
 }
 

@@ -91,7 +91,7 @@ static ssize_t pintfs_read(struct file *filp, char __user *buf, size_t count, lo
 		offset = 0;
 	}
 	
-	printk("pintfs - read %n bytes\n", bytes_read);
+	printk("pintfs - read %d bytes\n", bytes_read);
 	return bytes_read;
 }
 

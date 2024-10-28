@@ -14,8 +14,6 @@
 static int pintfs_create(struct inode *dir, struct dentry* dentry, umode_t mode, bool excl)
 {
 	struct inode *inode;
-	struct pintfs_inode* pi;
-	int err;
 	struct buffer_head *bh;
 	struct pintfs_dir_entry *pde;
 	int i, num_dirs;

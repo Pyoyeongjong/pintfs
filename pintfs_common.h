@@ -37,19 +37,8 @@ struct pintfs_super_block {
 };
 
 /*
-   pintfs_sb_info - Pintfs Superblock Info
-*/
-struct pintfs_sb_info {
-	struct pintfs_super_block *s_es; /* pintfs_super_block */
-	int s_first_ino; /* First inode (2) */
-	int s_inode_size;		/* Inode byte 크기 (64bytes)*/
-};
-
-/*
    pintfs_inode
 */
-#define ISDIR	1
-#define ISREG	0
 struct pintfs_inode {
 	int i_mode;		/* File mode */
 	int i_uid;		/* Low 16 bits of Owner Uid */
@@ -59,13 +48,7 @@ struct pintfs_inode {
 	unsigned int i_blocks; /* How many blocks this inode uses */
 };
 
-/*
-   pintfs_inode_info
-*/
-struct pintfs_inode_info {
-	unsigned int	i_data[15];
-	struct inode	vfs_inode;
-};
+
 
 /*
    pintfs_dir_entry - just dir_entry on disk

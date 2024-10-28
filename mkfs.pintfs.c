@@ -59,9 +59,29 @@ void init_bitmaps(int fd){
 		exit(1);
 	}
 }
+/*
+#define S_IFDIR	0040000;
+#define S_IFREG	0100000;
 
-#define ISDIR		1
-#define ISREG		0
+#define S_IRWXU 00700
+#define S_IRUSR 00400
+#define S_IWUSR 00200
+#define S_IXUSR 00100
+
+#define S_IRWXG 00070
+#define S_IRGRP 00040
+#define S_IWGRP 00020
+#define S_IXGRP 00010
+
+#define S_IRWXO 00007
+#define S_IROTH 00004
+#define S_IWOTH 00002
+#define S_IXOTH 00001
+*/
+#define S_IRUGO		(S_IRUSR|S_IRGRP|S_IROTH)
+#define S_IWUGO		(S_IWUSR|S_IWGRP|S_IWOTH)
+#define S_IXUGO		(S_IXUSR|S_IXGRP|S_IXOTH)
+
 /*
    init_root_inode_info - Write root inode in 3rd block
 */
@@ -69,9 +89,9 @@ void init_root_inode_info(int fd)
 {
 	struct pintfs_inode root_inode;
 	
-	root_inode.i_mode = //TODO: what mode should in here?;
+	root_inode.i_mode = S_IRUGO|S_IWUGO|S_IXUGO|S_IFDIR;
 	root_inode.i_uid = 1000;
-	root_inode.i_size = //TODO: should include . and .. !;
+	root_inode.i_size = sizeof(struct pintfs_dir_entry) * 2;
 	root_inode.i_time = time(NULL);
 	for(int i=0; i<PINTFS_N_BLOCKS; i++){
 		if(i == 0)
@@ -127,9 +147,13 @@ int main(int argc, char *argv[]) {
 	}
 
 	init_super_block(fd);
+	printf("Pintfs init super_block ok\n");
 	init_bitmaps(fd);
+	printf("Pintfs init bitmap ok\n");
 	init_root_inode_info(fd);
+	printf("Pintfs init root_inode_info ok\n");
 	write_root_dir_entry(fd);
+	printf("Pintfs init root_dir_entry ok\n");
 
 	printf("Pintfs init successed on %s\n",argv[1]);
 	close(fd);
