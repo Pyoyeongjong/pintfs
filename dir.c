@@ -38,43 +38,46 @@ int pintfs_empty_dir(struct inode *inode)
 static int pintfs_readdir(struct file *filp, struct dir_context *ctx)
 {	
 	struct inode *i;
-	struct pintfs_super_block *psb = PINTFS_SB(i->i_sb)->s_es;
 	int num_dirs, k;
 	struct pintfs_dir_entry *de;
 	struct buffer_head *bh;
-	unsigned long offset; // this is for iterating
-	unsigned long block_no = 0;
+	int error;
 
 	if(DEBUG)
 		printk("pintfs - readdir\n");
 	
-
 	i = file_inode(filp);
 	bh = pintfs_sb_bread_dir(i);
 	if(!bh){
 		return -EIO;
 	}
-	num_dirs = NUM_DIRS;
-	offset = 0;
+	num_dirs = i->i_size / sizeof(struct pintfs_dir_entry);
+	de = (struct pintfs_dir_entry *)(bh->b_data);
+	error = 0;
+	k = 0;
+	while(!error && filp->f_pos < i->i_size && k < num_dirs){
 
-	for(k=0; k<num_dirs; k++){
-		de = (struct pintfs_dir_entry *)(bh->b_data + offset);
-		if(de->inode_number){
-			printk("readdir - inode_number=%d\n",de->inode_number);
-			if(!dir_emit(ctx, de->name, strnlen(de->name, MAX_NAME_SIZE), de->inode_number,
-						DT_UNKNOWN)){
-				brelse(bh);
-				return 0;
-			}
+		if(!de->inode_number)
+			break;
+
+		printk("%dst entry -readdir - name=%s, inode_number=%d\n",
+				k, de->name, de->inode_number);
+
+		if(!dir_emit(ctx, de->name, strnlen(de->name, MAX_NAME_SIZE), de->inode_number, DT_UNKNOWN)){
+			brelse(bh);
+			return 0;
 		}
 		ctx->pos += sizeof(struct pintfs_dir_entry);
-		offset += sizeof(struct pintfs_dir_entry);
+		de++;
+		k++;
 	}
 
 	brelse(bh);
+	mark_inode_dirty(i);
 
 	if(DEBUG)
 		printk("pintfs - readdir done\n");
+
 	return 0;
 }
 

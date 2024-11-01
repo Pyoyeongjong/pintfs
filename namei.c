@@ -50,6 +50,7 @@ static int pintfs_create(struct inode *dir, struct dentry* dentry, umode_t mode,
 
 	mark_buffer_dirty(bh);
 	sync_dirty_buffer(bh);
+	dir->i_size += sizeof(struct pintfs_dir_entry);
 	brelse(bh);
 
 	d_instantiate(dentry, inode);
@@ -109,19 +110,26 @@ static struct dentry *pintfs_lookup(struct inode *dir,
 static int pintfs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
 {
 	struct inode *inode;
+	struct pintfs_inode_info *pii;
 	struct buffer_head *bh;
-	int num_dirs, i;
+	int num_dirs, i, new_blockno;
 	struct pintfs_dir_entry *pde;
 	if(DEBUG)
 		printk("pintfs - mkdir\n");
 
-	// Just get inode_number
+	// Just get inode_number?
+	// NO. Set block too.
 	inode = pintfs_new_inode(dir, S_IFDIR | mode);
 	if(!inode)
 		return -ENOSPC;
 	inode->i_op = &pintfs_dir_inode_ops;
 	inode->i_fop = &pintfs_dir_ops;
 	inode->i_mode = S_IFDIR | mode;
+
+	new_blockno = pintfs_empty_block(dir->i_sb);
+	pii = PINTFS_I(inode);
+	pii->i_data[0] = new_blockno;
+	set_bitmap(dir->i_sb, PINTFS_BLOCK_BITMAP_BLOCK, new_blockno, 1);
 
 	if (!dir)
 		return -1;
@@ -142,6 +150,8 @@ static int pintfs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
 	mark_buffer_dirty(bh);
 	sync_dirty_buffer(bh);
 	brelse(bh);
+
+	dir->i_size += sizeof(struct pintfs_dir_entry);
 
 	d_instantiate(dentry, inode);
 
@@ -200,13 +210,19 @@ static int pintfs_rmdir(struct inode *dir, struct dentry *dentry)
 	struct inode *inode = d_inode(dentry);
 	int err = -ENOTEMPTY;
 
+	if (DEBUG)
+		printk("pintfs - rmdir\n");
+
 	if(pintfs_empty_dir(inode)){
 		err = pintfs_unlink(dir, dentry);
 		if(!err) {
 			inode->i_size = 0;
-			inode_dec_link_count(inode);
+			//inode_dec_link_count(inode);
 		}
 	}
+
+	set_bitmap(inode->i_sb, PINTFS_INODE_BITMAP_BLOCK, inode->i_ino, 0);
+	set_bitmap(inode->i_sb, PINTFS_BLOCK_BITMAP_BLOCK, PINTFS_I(inode)->i_data[0], 0);
 	return err;
 }
 

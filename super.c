@@ -12,24 +12,28 @@
 
 #include "pintfs.h"
 #define DEBUG 1
+
+static struct kmem_cache *pintfs_inode_cache;
+
 int set_bitmap(struct super_block *sb, int bno, int no, int val)
 {
 	struct buffer_head *bh;
 	struct pintfs_super_block *psb = PINTFS_SB(sb)->s_es;
 
+	if (DEBUG)
+		printk("pintfs - set_bitmap\n");
+
 	if(bno == psb->inode_bitmap_block && no >= psb->inodes_count)
 		return -1;
 	else if(bno == psb->block_bitmap_block && no >= psb->blocks_count)
 		return -1;
-	else
-		return -EINVAL;
 
 	bh = sb_bread(sb, bno);
 	if(!bh)
 		return -EINVAL;
 
 	bh->b_data[no] = val;
-
+	printk("bh->b_data[no] = %d\n",bh->b_data[no]); 
 	mark_buffer_dirty(bh);
 	sync_dirty_buffer(bh);
 	brelse(bh);
@@ -37,6 +41,35 @@ int set_bitmap(struct super_block *sb, int bno, int no, int val)
 	return 0;
 }
 
+/*
+    pintfs_alloc_inode - alloc pintfs_inode_info
+*/
+static struct inode *pintfs_alloc_inode(struct super_block *sb)
+{
+    struct pintfs_inode_info *pi;
+	
+	if(DEBUG)
+		printk("pintfs - alloc_inode\n");
+
+	pi = kmem_cache_alloc(pintfs_inode_cache, GFP_KERNEL);
+
+    if(!pi){
+        printk("pintfs - pi is null!\n");
+        return NULL;
+    }
+
+    inode_set_iversion(&pi->vfs_inode, 1);
+    if (DEBUG)
+        printk("pintfs - alloc ok!\n");
+    return &pi->vfs_inode;
+}
+
+static void pintfs_free_inode(struct inode *inode)
+{
+	if (DEBUG)
+		printk("pintfs - free inode\n");
+	kmem_cache_free(pintfs_inode_cache, PINTFS_I(inode));
+}
 /*
 	pintfs_put_super - remove memory of super_block
 */
@@ -90,7 +123,6 @@ static int pintfs_fill_super(struct super_block *sb, void *data, int silent)
 	long ret = -ENOMEM;
 	struct buffer_head *bh;
 
-
 	if (DEBUG)
 		printk("pintfs - fill_super\n");
 
@@ -122,7 +154,6 @@ static int pintfs_fill_super(struct super_block *sb, void *data, int silent)
 	}
 
 	sb->s_blocksize = PINTFS_BLOCK_SIZE;
-	// setting root directory
 	sb->s_root = d_make_root(root);
 	if(!sb->s_root) {
 		ret = -ENOMEM;
@@ -130,8 +161,11 @@ static int pintfs_fill_super(struct super_block *sb, void *data, int silent)
 	}
 
 	brelse(bh);
-	if(DEBUG)
+	if(DEBUG){
+		printk("root inode->i_io_list=%p, prev=%p, next=%p\n",
+				&root->i_io_list, root->i_io_list.prev, root->i_io_list.next);
 		printk("pintfs - fill super ok!\n");
+	}
 	return 0;
 
 failed_inode:
@@ -169,11 +203,27 @@ static struct file_system_type pintfs_type = {
 };
 MODULE_ALIAS_FS("pintfs");
 
+
+static void init_once(void *foo)
+{
+	struct pintfs_inode_info *pi = (struct pintfs_inode_info *) foo;
+	inode_init_once(&pi->vfs_inode);
+}
+
 /*
 	init_pintfs, exit_pintfs - init, exit module
 */
 static int __init init_pintfs(void)
 { // __init <- for being in initialize code section
+
+	pintfs_inode_cache = kmem_cache_create("pintfs_inode_cache",
+                                           sizeof(struct pintfs_inode_info),
+                                           0, (SLAB_RECLAIM_ACCOUNT |
+                                               SLAB_MEM_SPREAD), init_once);
+    if (!pintfs_inode_cache){
+        return -ENOMEM;
+	}
+
 	return register_filesystem(&pintfs_type);	
 }
 

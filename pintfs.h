@@ -34,9 +34,7 @@ extern const struct file_operations pintfs_file_ops;
 /* inode.c */
 extern const struct inode_operations pintfs_file_inode_ops;
 int pintfs_write_inode(struct super_block *sb, struct inode* inode);
-struct inode *pintfs_alloc_inode(struct super_block *sb);
 int pintfs_empty_inode(struct super_block *sb);
-void pintfs_free_inode(struct inode *inode);
 void pintfs_evict_inode(struct inode *inode);
 struct inode *pintfs_iget(struct super_block *sb, unsigned long ino);
 struct inode *pintfs_new_inode(const struct inode *dir, umode_t mode);

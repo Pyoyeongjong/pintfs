@@ -18,6 +18,9 @@ static int pintfs_expand_file(struct inode *inode, int index)
 	struct pintfs_inode_info *pii;
 	int block_no;
 
+	if(DEBUG)
+		printk("pintfs - expand_file\n");
+
 	pii = PINTFS_I(inode);
 	if(pii->i_data[index] > 0)
 		return 0;
@@ -91,7 +94,9 @@ static ssize_t pintfs_read(struct file *filp, char __user *buf, size_t count, lo
 		offset = 0;
 	}
 	
-	printk("pintfs - read %d bytes\n", bytes_read);
+	if (DEBUG)
+		printk("pintfs - read %d bytes\n", bytes_read);
+
 	return bytes_read;
 }
 
@@ -100,11 +105,10 @@ static ssize_t pintfs_write(struct file *filp, const char __user *buf, size_t co
 	struct inode *inode = filp->f_inode;
 	struct super_block *sb;
 	struct buffer_head *bh;
-	char *start;
 	int index, offset, bytes_to_write, bytes_written, block_write;
 
 	if(DEBUG)
-		printk("pintfs - file writ\n");
+		printk("pintfs - file write at ppos=%d\n",*ppos);
 
 	if(!inode)
 		return -EINVAL;
@@ -116,11 +120,11 @@ static ssize_t pintfs_write(struct file *filp, const char __user *buf, size_t co
 		return 0;
 
 	sb = inode->i_sb;
-	start = buf;
-
-	printk("w : writeblock\n");
 	index = *ppos / PINTFS_BLOCK_SIZE;
 	offset = *ppos % PINTFS_BLOCK_SIZE;
+
+	if (DEBUG)
+		printk("file write - index=%d, offset=%d\n",index, offset);
 
 	bytes_to_write = count;
 	bytes_written = 0;
@@ -139,7 +143,7 @@ static ssize_t pintfs_write(struct file *filp, const char __user *buf, size_t co
 			return -EIO;
 
 		block_write = min(PINTFS_BLOCK_SIZE - offset, bytes_to_write);
-		if(copy_from_user(bh->b_data + offset, start + bytes_written, block_write)){
+		if(copy_from_user(bh->b_data + offset, buf + bytes_written, block_write)){
 			brelse(bh);
 			return -EIO;
 		}
@@ -158,7 +162,9 @@ static ssize_t pintfs_write(struct file *filp, const char __user *buf, size_t co
 		offset = 0;
 	}
 
-	return 0;
+	if (DEBUG)
+		printk("pintfs - write %d bytes\n", bytes_written);
+	return bytes_written;
 }
 
 /*
