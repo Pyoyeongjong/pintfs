@@ -13,6 +13,7 @@
 
 #define DEBUG 1
 
+static struct pintfs_inode *pintfs_get_inode(struct super_block *sb, ino_t ino, struct buffer_head **bh);
 
 /*
 	pintfs_write_inode - Write pintfs_inode in block device
@@ -29,16 +30,20 @@ int pintfs_write_inode(struct super_block *sb, struct inode* inode)
 	pinode.i_mode = inode->i_mode;
 	pinode.i_uid = from_kuid(&init_user_ns, inode->i_uid);  // 변환 후 저장
 	pinode.i_size = inode->i_size;
-	pinode.i_time = inode->i_mtime.tv_sec;
+	pinode.i_time = inode->i_atime.tv_sec;
 	memcpy(pinode.i_block, pii->i_data, PINTFS_N_BLOCKS);
 	pinode.i_blocks = inode->i_blocks;
 
+	print_pintfs_inode(&pinode);
 	bh = sb_bread(sb, pintfs_get_blocknum(inum));
 	if(!bh)
 		return -ENOSPC;
-	memcpy(bh->b_data + inum*sizeof(struct pintfs_inode), &pinode, sizeof(struct pintfs_inode));
+	memcpy(bh->b_data + (inum - 1)*sizeof(struct pintfs_inode), &pinode, sizeof(struct pintfs_inode));
 	mark_buffer_dirty(bh);
 	sync_dirty_buffer(bh);
+	brelse(bh);
+
+	print_pintfs_inode(pintfs_get_inode(sb, inum, &bh));
 	brelse(bh);
 
 	if(DEBUG)
@@ -71,9 +76,7 @@ int pintfs_empty_inode(struct super_block *sb)
 		return result;
 
 	memcpy(inode_bitmap, bh->b_data, PINTFS_INODE_BITMAP_SIZE);	
-	printk("empty_inode = ");
 	for(i=PINTFS_GOOD_FIRST_INO; i<PINTFS_INODE_BITMAP_SIZE; i++){
-		printk("%d ",i);
 		if(inode_bitmap[i] == 0){
 			bh->b_data[i] = 1;
 			mark_buffer_dirty(bh);
@@ -96,7 +99,7 @@ void pintfs_evict_inode(struct inode *inode)
 	int ino, i;
 
 	if (DEBUG)
-		printk("pintfs - pintfs_evict_inode\n");
+		printk("pintfs - pintfs_evict_inode: ino=%ld\n",inode->i_ino);
 
 	pii = PINTFS_I(inode);
 	ino = inode->i_ino;
@@ -104,18 +107,18 @@ void pintfs_evict_inode(struct inode *inode)
 
 	for(i=0; i<PINTFS_N_BLOCKS; i++)
 	{
-		if(pii->i_data[i] > 0)
-			set_bitmap(sb, PINTFS_BLOCK_BITMAP_BLOCK, pii->i_data[i], 0);
+		// do nothing.. 
+		i += 1;
+		i -= 1;
 	}
 
-	set_bitmap(sb, PINTFS_INODE_BITMAP_BLOCK, ino, 0);
-	
-    truncate_inode_pages_final(&inode->i_data);
-
-    clear_inode(inode);
-
-	mark_inode_dirty(inode);
-	
+	pintfs_write_inode(sb, inode);
+    //truncate_inode_pages_final(&inode->i_data);
+    //clear_inode(inode);
+	//mark_inode_dirty(inode);
+	if (DEBUG)
+		printk("pintfs - evict inode done: ino=%ld\n", inode->i_ino);
+	return;	
 }
 
 /*
@@ -164,15 +167,13 @@ struct inode *pintfs_new_inode(const struct inode *dir, umode_t mode)
 /*
 	pintfs_get_inode - get bh data
 */
-static struct pintfs_inode *pintfs_get_inode(struct super_block *sb, ino_t ino,
-		struct buffer_head **p)
+static struct pintfs_inode *pintfs_get_inode(struct super_block *sb, ino_t ino, struct buffer_head **p)
 {
 	struct buffer_head *bh;
-	unsigned long block;
 	unsigned long offset;
 
 	if(DEBUG)
-		printk("pintfs - pintfs_get_inode\n");
+		printk("pintfs - pintfs_get_inode: ino=%ld\n",ino);
 
 	*p = NULL;
 	if ((ino != PINTFS_ROOT_INO && ino < PINTFS_GOOD_FIRST_INO) ||
@@ -180,9 +181,9 @@ static struct pintfs_inode *pintfs_get_inode(struct super_block *sb, ino_t ino,
 		goto Einval;
 
 	offset = (ino - 1) % PINTFS_INODES_PER_BLOCK * PINTFS_INODE_SIZE;
-	block = PINTFS_FIRST_INODE_BLOCK + (ino - 1) / PINTFS_INODES_PER_BLOCK;
 	
-	if(!(bh = sb_bread(sb, block)))
+	printk("pintfs_inode_size = %ld\n",PINTFS_INODE_SIZE);
+	if(!(bh = sb_bread(sb, pintfs_get_blocknum(ino))))
 		goto Eio;
 
 	*p = bh;
@@ -210,7 +211,7 @@ struct inode *pintfs_iget(struct super_block *sb, unsigned long ino)
 	int i;
 
 	if (DEBUG)
-		printk("pintfs - pintfs_iget\n");
+		printk("pintfs - pintfs_iget: ino=%ld\n",ino);
 
 	inode = iget_locked(sb, ino);
 	if(!inode)
@@ -230,7 +231,6 @@ struct inode *pintfs_iget(struct super_block *sb, unsigned long ino)
 	inode->i_flags = 0;	
 	inode->i_mode = raw_inode->i_mode;
 	inode->i_size = raw_inode->i_size;
-	printk("inode->i_size = %d\n");
 	inode->i_ctime = inode->i_mtime = inode->i_atime = current_time(inode);
 
 	if(S_ISDIR(raw_inode->i_mode)){

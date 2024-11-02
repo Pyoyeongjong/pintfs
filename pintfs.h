@@ -51,8 +51,7 @@ static inline struct pintfs_sb_info *PINTFS_SB(struct super_block *sb)
 
 static inline int pintfs_get_blocknum(int inum)
 {
-	int inodes_per_block = PINTFS_BLOCK_SIZE / PINTFS_INODE_SIZE;
-	return PINTFS_FIRST_INODE_BLOCK + inum / inodes_per_block; 
+	return PINTFS_FIRST_INODE_BLOCK + (inum - 1) / PINTFS_INODES_PER_BLOCK; 
 }
 
 static inline struct pintfs_inode_info *PINTFS_I(struct inode* inode)
@@ -69,14 +68,15 @@ static inline struct buffer_head *pintfs_sb_bread_dir(struct inode* inode)
 static inline struct buffer_head *pintfs_sb_bread_file(struct inode* inode, int block_index)
 {
 	int block_no = PINTFS_I(inode)->i_data[block_index];
+	printk("pintfs_sb_bread_file - block_no = %d\n", block_no);
 	if(block_no <= 0)
 		return NULL;
 	else
-		return sb_bread(inode->i_sb, PINTFS_I(inode)->i_data[block_no]);	
+		return sb_bread(inode->i_sb, block_no);	
 }
 
 static inline void print_pintfs_inode(struct pintfs_inode *pi){
-	printk("pi=%p, i_mode = %x, i_uid=%d, i_size= %ld, i_time=%lld\n"
+	printk("pi=%p, i_mode = %o, i_uid=%d, i_size= %ld, i_time=%lld\n"
 			,pi, pi->i_mode, pi->i_uid, pi->i_size, pi->i_time);
 }
 

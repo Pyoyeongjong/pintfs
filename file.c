@@ -76,12 +76,15 @@ static ssize_t pintfs_read(struct file *filp, char __user *buf, size_t count, lo
 	printk("r : copy to user\n");
 	while(bytes_read < bytes_to_read)
 	{
-		bh = pintfs_sb_bread_file(inode, index);
-		if(!bh)
+		bh = pintfs_sb_bread_file(inode, index);	
+		printk("DATA block content: %.20s\n", bh->b_data);
+		if(!bh){
+			printk(" here? 1");
 			return -EIO;
-
+		}
 		block_read = min((PINTFS_BLOCK_SIZE - offset), bytes_to_read);
 		if(copy_to_user(start + bytes_read, bh->b_data + offset, block_read)){
+			printk(" here? 22");
 			brelse(bh);
 			return -EIO;
 		}
@@ -108,7 +111,7 @@ static ssize_t pintfs_write(struct file *filp, const char __user *buf, size_t co
 	int index, offset, bytes_to_write, bytes_written, block_write;
 
 	if(DEBUG)
-		printk("pintfs - file write at ppos=%d\n",*ppos);
+		printk("pintfs - file write at ppos=%lld\n",*ppos);
 
 	if(!inode)
 		return -EINVAL;
@@ -162,6 +165,7 @@ static ssize_t pintfs_write(struct file *filp, const char __user *buf, size_t co
 		offset = 0;
 	}
 
+	pintfs_write_inode(inode->i_sb, inode);
 	if (DEBUG)
 		printk("pintfs - write %d bytes\n", bytes_written);
 	return bytes_written;

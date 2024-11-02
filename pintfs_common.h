@@ -1,9 +1,8 @@
 #define PINTFS_MAGIC_NUMBER 0xDEADBEEF
 #define PINTFS_BLOCK_SIZE (1 << 12) /* 4KB */
-#define PINTFS_N_BLOCKS		10
+#define PINTFS_N_BLOCKS		8
 
 #define PINTFS_MAX_FILE_SIZE (PINTFS_BLOCK_SIZE) * PINTFS_N_BLOCKS;
-#define PINTFS_INODE_SIZE			64
 #define PINTFS_INODE_BITMAP_SIZE	128
 #define PINTFS_BLOCK_BITMAP_SIZE	64
 #define PINTFS_INODES_PER_BLOCK		(PINTFS_BLOCK_SIZE / PINTFS_INODE_SIZE) 
@@ -44,10 +43,10 @@ struct pintfs_inode {
 	int i_uid;		/* Low 16 bits of Owner Uid */
 	ssize_t i_size;		/* Size in bytes */
 	long long i_time;		/* Access, Create, Modificate, or Deletion Time */
-	unsigned int i_block[PINTFS_N_BLOCKS]; /* Direct 0~9, Indirect 10 */
+	unsigned int i_block[PINTFS_N_BLOCKS]; /* Direct 0~6, Indirect 7 */
 	unsigned int i_blocks; /* How many blocks this inode uses */
 };
-
+#define PINTFS_INODE_SIZE sizeof(struct pintfs_inode)
 
 
 /*

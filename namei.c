@@ -20,7 +20,7 @@ static int pintfs_create(struct inode *dir, struct dentry* dentry, umode_t mode,
 	if (DEBUG)
 		printk("pintfs - create\n");
 
-	inode = pintfs_new_inode(dir, S_IRUGO|S_IWUGO|S_IFREG);
+	inode = pintfs_new_inode(dir, S_IFREG | mode);
 	if(!inode)
 		return -ENOSPC;
 	
@@ -50,10 +50,14 @@ static int pintfs_create(struct inode *dir, struct dentry* dentry, umode_t mode,
 
 	mark_buffer_dirty(bh);
 	sync_dirty_buffer(bh);
-	dir->i_size += sizeof(struct pintfs_dir_entry);
 	brelse(bh);
+	pintfs_write_inode(inode->i_sb, inode);
 
+	dir->i_size += sizeof(struct pintfs_dir_entry);
+	dir->i_atime = current_time(dir);
 	d_instantiate(dentry, inode);
+	pintfs_write_inode(dir->i_sb, dir);
+
 	mark_inode_dirty(dir);
 	mark_inode_dirty(inode);
 
@@ -146,14 +150,17 @@ static int pintfs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
 	strncpy(pde->name, dentry->d_name.name, dentry->d_name.len);
 	pde->name[dentry->d_name.len] = '\0';
 	pde->inode_number = inode->i_ino;
+	
+	pintfs_write_inode(inode->i_sb, inode);
 
 	mark_buffer_dirty(bh);
 	sync_dirty_buffer(bh);
 	brelse(bh);
 
 	dir->i_size += sizeof(struct pintfs_dir_entry);
-
+	dir->i_atime = current_time(dir);
 	d_instantiate(dentry, inode);
+	pintfs_write_inode(dir->i_sb, dir);
 
 	mark_inode_dirty(dir);
 	printk("Directory created\n");

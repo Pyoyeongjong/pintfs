@@ -33,7 +33,7 @@ int set_bitmap(struct super_block *sb, int bno, int no, int val)
 		return -EINVAL;
 
 	bh->b_data[no] = val;
-	printk("bh->b_data[no] = %d\n",bh->b_data[no]); 
+	printk("bh->b_data[%d] = %d\n", no, bh->b_data[no]); 
 	mark_buffer_dirty(bh);
 	sync_dirty_buffer(bh);
 	brelse(bh);
@@ -106,7 +106,7 @@ static int pintfs_statfs(struct dentry *dentry, struct kstatfs *buf)
 const struct super_operations pintfs_super_ops = {
 	.alloc_inode = pintfs_alloc_inode,
 	.free_inode = pintfs_free_inode,
-	.evict_inode = pintfs_evict_inode,
+//	.evict_inode = pintfs_evict_inode,
 	.put_super = pintfs_put_super,	
 	.statfs = pintfs_statfs,
 };
