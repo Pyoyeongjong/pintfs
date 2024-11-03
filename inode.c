@@ -8,9 +8,7 @@
 #include <linux/stat.h>
 #include <linux/time64.h>
 #include <linux/module.h>
-
 #include "pintfs.h"
-
 #define DEBUG 1
 
 static struct pintfs_inode *pintfs_get_inode(struct super_block *sb, ino_t ino, struct buffer_head **bh);
@@ -51,6 +49,9 @@ int pintfs_write_inode(struct super_block *sb, struct inode* inode)
 	return PINTFS_INODE_SIZE;	
 }
 
+/*
+   pintfs_empty_inode - Find usable inode number
+*/
 int pintfs_empty_inode(struct super_block *sb)
 {
 	struct pintfs_sb_info *sbi;
@@ -61,7 +62,7 @@ int pintfs_empty_inode(struct super_block *sb)
 	int result = -1, i;
 	
 	if(DEBUG)
-		printk("pintfs - pintfs_empty_inode\n");
+		printk("pintfs - empty_inode\n");
 
 	sbi = PINTFS_SB(sb);
 
@@ -87,11 +88,14 @@ int pintfs_empty_inode(struct super_block *sb)
 	}
 	
 	brelse(bh);
+	if(DEBUG)
+		printk("pintfs - find empty ino: return (ino=%d)\n",result); 
 	return result;
 }
 
-
-
+/*
+   pintfs_evict_inode - It is useless now..(11.03)
+*/
 void pintfs_evict_inode(struct inode *inode)
 {
 	struct pintfs_inode_info *pii;
@@ -99,7 +103,7 @@ void pintfs_evict_inode(struct inode *inode)
 	int ino, i;
 
 	if (DEBUG)
-		printk("pintfs - pintfs_evict_inode: ino=%ld\n",inode->i_ino);
+		printk("pintfs - evict_inode: ino=%ld\n",inode->i_ino);
 
 	pii = PINTFS_I(inode);
 	ino = inode->i_ino;
@@ -116,8 +120,6 @@ void pintfs_evict_inode(struct inode *inode)
     //truncate_inode_pages_final(&inode->i_data);
     //clear_inode(inode);
 	//mark_inode_dirty(inode);
-	if (DEBUG)
-		printk("pintfs - evict inode done: ino=%ld\n", inode->i_ino);
 	return;	
 }
 
@@ -165,7 +167,7 @@ struct inode *pintfs_new_inode(const struct inode *dir, umode_t mode)
 }
 
 /*
-	pintfs_get_inode - get bh data
+	pintfs_get_inode - Get pintfs_inode data in disk
 */
 static struct pintfs_inode *pintfs_get_inode(struct super_block *sb, ino_t ino, struct buffer_head **p)
 {
@@ -182,7 +184,6 @@ static struct pintfs_inode *pintfs_get_inode(struct super_block *sb, ino_t ino, 
 
 	offset = (ino - 1) % PINTFS_INODES_PER_BLOCK * PINTFS_INODE_SIZE;
 	
-	printk("pintfs_inode_size = %ld\n",PINTFS_INODE_SIZE);
 	if(!(bh = sb_bread(sb, pintfs_get_blocknum(ino))))
 		goto Eio;
 
@@ -198,7 +199,7 @@ Eio:
 }
 
 /*
-	pintfs_iget - fill pintfs data in inode
+	pintfs_iget - Fill pintfs data in inode
 */
 struct inode *pintfs_iget(struct super_block *sb, unsigned long ino)
 {	

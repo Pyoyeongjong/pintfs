@@ -7,12 +7,17 @@
 
 #define DEBUG 1
 
+/*
+   pintfs_empty_dir - to see dir is empty or not
+*/
 int pintfs_empty_dir(struct inode *inode)
 {
 	struct buffer_head *bh;
 	struct pintfs_dir_entry *pde;
 	int i, num_dirs;
 
+	if (DEBUG)
+		printk("pintfs - empty_dir\n");
 	bh = pintfs_sb_bread_dir(inode);
 	if(!bh)
 		return -EINVAL;
@@ -29,11 +34,11 @@ int pintfs_empty_dir(struct inode *inode)
 
 	brelse(bh);
 	return true;
-	
 }
 
 /*
-   pintfs_readdir - 중단된다면 중간 ctx->pos부터 탐색이 가능하게 만들어야 한다!
+   pintfs_readdir - read all dir_entry in directory
+   중단된다면 중간 ctx->pos부터 탐색이 가능하게 만들어야 한다!
 */
 static int pintfs_readdir(struct file *filp, struct dir_context *ctx)
 {	
@@ -56,13 +61,8 @@ static int pintfs_readdir(struct file *filp, struct dir_context *ctx)
 	error = 0;
 	k = 0;
 	while(!error && filp->f_pos < i->i_size && k < num_dirs){
-
 		if(!de->inode_number)
 			break;
-
-		printk("%dst entry -readdir - name=%s, inode_number=%d\n",
-				k, de->name, de->inode_number);
-
 		if(!dir_emit(ctx, de->name, strnlen(de->name, MAX_NAME_SIZE), de->inode_number, DT_UNKNOWN)){
 			brelse(bh);
 			return 0;
@@ -74,10 +74,6 @@ static int pintfs_readdir(struct file *filp, struct dir_context *ctx)
 
 	brelse(bh);
 	mark_inode_dirty(i);
-
-	if(DEBUG)
-		printk("pintfs - readdir done\n");
-
 	return 0;
 }
 

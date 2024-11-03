@@ -18,6 +18,7 @@
 #define PINTFS_GOOD_FIRST_INO 2
 
 #define MAX_NAME_SIZE 15
+
 /* 
 	pintfs_super_block - Superblock Metadata (It is on 0 block)
 */
@@ -34,7 +35,6 @@ struct pintfs_super_block {
 	int				first_inode_block; /* pintfs_inode가 저장된 block 위치 */
 	unsigned int	first_data_block;	/* 5 */
 };
-
 /*
    pintfs_inode
 */
@@ -47,8 +47,6 @@ struct pintfs_inode {
 	unsigned int i_blocks; /* How many blocks this inode uses */
 };
 #define PINTFS_INODE_SIZE sizeof(struct pintfs_inode)
-
-
 /*
    pintfs_dir_entry - just dir_entry on disk
 */

@@ -2,11 +2,8 @@
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/buffer_head.h>
-
 #include "pintfs.h"
-
 #define DEBUG 1
-
 
 /*
    pintfs_create - create a new file in a directory
@@ -111,6 +108,9 @@ static struct dentry *pintfs_lookup(struct inode *dir,
 	return NULL;
 }
 
+/*
+   pintfs_mkdir - make directory
+*/
 static int pintfs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
 {
 	struct inode *inode;
@@ -167,7 +167,9 @@ static int pintfs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
 	return 0;
 }
 
-//TODO: later.. 10.13	
+/*
+   pintfs_unlink - delete file and unlink file and dir
+*/
 static int pintfs_unlink(struct inode *dir, struct dentry *dentry)
 {
 	struct buffer_head *bh;
@@ -178,7 +180,7 @@ static int pintfs_unlink(struct inode *dir, struct dentry *dentry)
 		printk("pintfs - unlink\n");
 
 	bh = pintfs_sb_bread_dir(dir); 
-	num_dirs =  PINTFS_BLOCK_SIZE / sizeof(struct pintfs_dir_entry);
+	num_dirs = dir->i_size / sizeof(struct pintfs_dir_entry);
 
 	for(i=0; i<num_dirs; i++){
 		pde = (struct pintfs_dir_entry *)((bh->b_data) + i*sizeof(struct pintfs_dir_entry));
@@ -211,7 +213,9 @@ static int pintfs_unlink(struct inode *dir, struct dentry *dentry)
 	return -ENOENT;
 }
 
-
+/*
+   pintfs_rmdir - remove directory
+*/
 static int pintfs_rmdir(struct inode *dir, struct dentry *dentry)
 {
 	struct inode *inode = d_inode(dentry);
@@ -233,7 +237,9 @@ static int pintfs_rmdir(struct inode *dir, struct dentry *dentry)
 	return err;
 }
 
-// tunrcate ???
+/*
+   pintfs_setattr - set file attribute
+*/
 static int pintfs_setattr(struct dentry *dentry, struct iattr *iattr)
 {
 	return 0;

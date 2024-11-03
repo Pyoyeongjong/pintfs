@@ -7,10 +7,15 @@
 #include "pintfs.h"
 #define DEBUG 1
 
+/*
+	pintfs_need_file_ectension - to know inode should alloc more blocks!
+*/
 static bool pintfs_need_file_extension(struct inode *inode, int index){
 	return PINTFS_I(inode)->i_data[index] == 0;
 }
-
+/*
+   pintfs_expand_file - alloc new block for inode
+*/
 static int pintfs_expand_file(struct inode *inode, int index)
 {
 	
@@ -37,7 +42,9 @@ static int pintfs_expand_file(struct inode *inode, int index)
 	mark_inode_dirty(inode);
 	return block_no;
 }
-
+/*
+   pintfs_read - read file
+*/
 static ssize_t pintfs_read(struct file *filp, char __user *buf, size_t count, loff_t *ppos)
 {
 	struct buffer_head *bh;
@@ -66,25 +73,22 @@ static ssize_t pintfs_read(struct file *filp, char __user *buf, size_t count, lo
 	sb = inode->i_sb;
 	start = buf;
 
-	printk("r : readblock\n");	
+	printk("pintfs - readblock\n");	
 	index = *ppos / PINTFS_BLOCK_SIZE;
 	offset = *ppos % PINTFS_BLOCK_SIZE;
 	
 	bytes_to_read = min(count, (size_t)(inode->i_size - *ppos));
 	bytes_read = 0;
 
-	printk("r : copy to user\n");
+	printk("pintfs - copy to user\n");
 	while(bytes_read < bytes_to_read)
 	{
 		bh = pintfs_sb_bread_file(inode, index);	
-		printk("DATA block content: %.20s\n", bh->b_data);
 		if(!bh){
-			printk(" here? 1");
 			return -EIO;
 		}
 		block_read = min((PINTFS_BLOCK_SIZE - offset), bytes_to_read);
 		if(copy_to_user(start + bytes_read, bh->b_data + offset, block_read)){
-			printk(" here? 22");
 			brelse(bh);
 			return -EIO;
 		}
@@ -102,7 +106,9 @@ static ssize_t pintfs_read(struct file *filp, char __user *buf, size_t count, lo
 
 	return bytes_read;
 }
-
+/*
+   pintfs_write - write file
+*/
 static ssize_t pintfs_write(struct file *filp, const char __user *buf, size_t count, loff_t *ppos)
 {
 	struct inode *inode = filp->f_inode;
@@ -140,7 +146,6 @@ static ssize_t pintfs_write(struct file *filp, const char __user *buf, size_t co
 				break;
 			}
 		}
-
 		bh = pintfs_sb_bread_file(inode, index);
 		if(!bh)
 			return -EIO;

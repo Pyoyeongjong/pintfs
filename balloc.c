@@ -1,10 +1,12 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/buffer_head.h>
-
 #include "pintfs.h"
-
 #define	DEBUG	1
+
+/*
+	pintfs_empty_block - find next usable block number
+*/
 int pintfs_empty_block(struct super_block *sb)
 {
 	struct pintfs_sb_info *sbi;
@@ -18,13 +20,11 @@ int pintfs_empty_block(struct super_block *sb)
 		printk("pintfs - pintfs_empty_block\n");
 
 	sbi = PINTFS_SB(sb);
-
 	if(!sbi)
 		return result;
 
 	psb = sbi->s_es;
 	block_bitmap_bno = psb->block_bitmap_block;
-
 	bh = sb_bread(sb, block_bitmap_bno);
 	if(!bh)
 		return result;
@@ -40,7 +40,6 @@ int pintfs_empty_block(struct super_block *sb)
 		}
 	}
 	
-
 	brelse(bh);
 	return result;
 }

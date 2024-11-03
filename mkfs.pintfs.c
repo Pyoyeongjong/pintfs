@@ -2,10 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
-#include <unistd.h> // pwrite
-#include <fcntl.h> // open
+#include <unistd.h>
+#include <fcntl.h>
 #include <time.h>
-
 #include "pintfs_common.h"
 
 /*
@@ -32,7 +31,6 @@ void init_super_block(int fd){
 		exit(1);
 	}	
 }
-
 /*
    init_bitmaps - Write bitmap datas in 1st, 2nd block and
 */
@@ -81,7 +79,6 @@ void init_bitmaps(int fd){
 #define S_IRUGO		(S_IRUSR|S_IRGRP|S_IROTH)
 #define S_IWUGO		(S_IWUSR|S_IWGRP|S_IWOTH)
 #define S_IXUGO		(S_IXUSR|S_IXGRP|S_IXOTH)
-
 /*
    init_root_inode_info - Write root inode in 3rd block
 */
@@ -91,7 +88,7 @@ void init_root_inode_info(int fd)
 	
 	root_inode.i_mode = S_IRUGO|S_IWUGO|S_IXUGO|S_IFDIR;
 	root_inode.i_uid = 1000;
-	root_inode.i_size = sizeof(struct pintfs_dir_entry) * 2;
+	root_inode.i_size = 0;
 	root_inode.i_time = time(NULL);
 	for(int i=0; i<PINTFS_N_BLOCKS; i++){
 		if(i == 0)
@@ -109,7 +106,6 @@ void init_root_inode_info(int fd)
 		exit(1);
 	}
 }
-
 /*
    write_root_dir_entry - Write root dir_entry int 5th block
 */
@@ -152,8 +148,8 @@ int main(int argc, char *argv[]) {
 	printf("Pintfs init bitmap ok\n");
 	init_root_inode_info(fd);
 	printf("Pintfs init root_inode_info ok\n");
-	write_root_dir_entry(fd);
-	printf("Pintfs init root_dir_entry ok\n");
+	//write_root_dir_entry(fd);
+	//printf("Pintfs init root_dir_entry ok\n");
 
 	printf("Pintfs init successed on %s\n",argv[1]);
 	close(fd);
