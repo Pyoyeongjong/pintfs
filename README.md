@@ -1,4 +1,4 @@
-실행하는 법
+How to use
 
 1. git clone "this repo"
 2. cd pintfs
@@ -8,4 +8,7 @@
 6. sudo ./mkfs.pintfs pintdisk.raw
 7. boot QEMU
 8. sudo insmod pintfs.ko
-9. sudo mount -o loop -t pintfs pintdisk.raw /mnt/pintfs
+9. mkdir testdir
+10. sudo mount -o loop -t pintfs pintdisk.raw /mnt/pintfs/testdir
+
+Wow
